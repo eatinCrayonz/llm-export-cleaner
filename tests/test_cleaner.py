@@ -140,6 +140,19 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(projects[0]["name"], "My research")
         self.assertEqual(rows[0]["project_name"], "My research")
 
+    def test_claude_project_catalog_maps_uuid_to_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); db = root / "cleaner.sqlite3"; export = root / "one.json"
+            self._write_claude(export, extended=True)
+            import_export(provider="claude", input_path=export, database_path=db)
+            apply_page(database_path=db, page_text=json.dumps({"data": [{"uuid": "c1", "project_uuid": "p1"}], "has_more": False}))
+            catalog = json.dumps({"data": [{"uuid": "p1", "name": "Mr Thinker", "is_private": True, "permissions": ["chat_project:view"]}], "pagination": {"total": 1, "limit": 1, "offset": 0, "has_more": False}})
+            parsed = parse_page(catalog); result = apply_page(database_path=db, page_text=catalog)
+            rows = list_conversations(database_path=db, in_project=True)
+        self.assertEqual(parsed["kind"], "projects")
+        self.assertEqual(result["named_projects"], 1)
+        self.assertEqual(rows[0]["project_name"], "Mr Thinker")
+
     def test_delta_export_uses_import_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); db = root / "cleaner.sqlite3"; first_file = root / "first.json"; second_file = root / "second.json"

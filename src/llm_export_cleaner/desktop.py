@@ -256,7 +256,7 @@ class CleanerApp:
         window.geometry("760x600")
         frame = ttk.Frame(window, padding=14)
         frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text="Paste the complete Claude website JSON response. Both observed response formats are supported.", wraplength=700).pack(anchor="w", pady=(0, 10))
+        ttk.Label(frame, text="Paste a Claude conversation-list or Project-list JSON response. Conversation pages assign membership; Project pages assign names.", wraplength=700).pack(anchor="w", pady=(0, 10))
         text = scrolledtext.ScrolledText(frame, wrap="none")
         text.pack(fill="both", expand=True)
         buttons = ttk.Frame(frame)
@@ -350,7 +350,11 @@ class CleanerApp:
                     self.profile_status.configure(text=f"Exported {payload['conversations_exported']:,} conversations ({payload['output_bytes']:,} bytes)")
                 elif kind == "claude":
                     more = f"; more at offset {payload['next_offset']}" if payload["has_more"] else ""
-                    self.import_status.configure(text=f"Claude Projects: {payload['updated']} updated, {payload['unknown']} unknown{more}")
+                    if payload["kind"] == "projects":
+                        status = f"Claude Projects: {payload['named_projects']} names saved{more}"
+                    else:
+                        status = f"Claude Projects: {payload['updated']} updated, {payload['unknown']} unknown{more}"
+                    self.import_status.configure(text=status)
                     self._refresh_stats(); self._browse()
                 elif kind == "history":
                     rows = [{"provider": r["provider"], "title": r["source_file"], "updated_at": r["imported_at_utc"], "active_user_turn_count": "import", "project_id": None, "included": 1, "conversation_id": "", "snippet": f"{r['new_conversations']} new; {r['changed_conversations']} changed; {r['unchanged_conversations']} unchanged"} for r in payload]

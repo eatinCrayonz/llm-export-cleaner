@@ -1,4 +1,4 @@
-"""Manual Claude website conversation-list enrichment."""
+"""Manual Claude website conversation and Project-list enrichment."""
 
 from __future__ import annotations
 
@@ -22,9 +22,23 @@ def parse_page(text: str) -> dict[str, Any]:
     assignments: dict[str, str | None] = {}
     projects: set[str] = set()
     names: dict[str, str] = {}
+    project_catalog = bool(records) and all(
+        isinstance(record, dict) and (
+            "permissions" in record or "is_private" in record or "is_starter_project" in record
+        )
+        for record in records
+    )
     for index, record in enumerate(records, 1):
         if not isinstance(record, dict) or not record.get("uuid"):
-            raise ValueError(f"Claude record {index} has no conversation UUID")
+            raise ValueError(f"Claude record {index} has no UUID")
+        if project_catalog:
+            project_id = str(record["uuid"])
+            name = str(record.get("name") or "").strip()
+            if not name:
+                raise ValueError(f"Claude Project record {index} has no name")
+            projects.add(project_id)
+            names[project_id] = name
+            continue
         conversation_id = str(record["uuid"])
         if conversation_id in assignments:
             raise ValueError(f"Duplicate conversation UUID: {conversation_id}")
@@ -39,6 +53,7 @@ def parse_page(text: str) -> dict[str, Any]:
     offset = int(pagination.get("offset") or 0)
     return {
         "assignments": assignments, "project_names": names,
+        "kind": "projects" if project_catalog else "conversations",
         "records": len(records), "projects": len(projects),
         "has_more": pagination.get("has_more") is True,
         "next_offset": offset + len(records),
@@ -50,7 +65,7 @@ def apply_page(*, database_path: Any, page_text: str) -> dict[str, Any]:
 
     parsed = parse_page(page_text)
     db = connect(database_path)
-    matched = updated = unchanged = unknown = 0
+    matched = updated = unchanged = unknown = named_projects = 0
     try:
         with db:
             for project_id, name in parsed["project_names"].items():
@@ -59,6 +74,7 @@ def apply_page(*, database_path: Any, page_text: str) -> dict[str, Any]:
                     "ON CONFLICT(provider,project_id) DO UPDATE SET name=excluded.name",
                     (project_id, name),
                 )
+                named_projects += 1
             for conversation_id, project_id in parsed["assignments"].items():
                 row = db.execute("SELECT project_id FROM conversations WHERE provider='claude' AND conversation_id=?", (conversation_id,)).fetchone()
                 if row is None:
@@ -73,4 +89,4 @@ def apply_page(*, database_path: Any, page_text: str) -> dict[str, Any]:
             recompute_profiles(db, providers={"claude"})
     finally:
         db.close()
-    return {**{k: parsed[k] for k in ("records", "projects", "has_more", "next_offset")}, "matched": matched, "updated": updated, "unchanged": unchanged, "unknown": unknown}
+    return {**{k: parsed[k] for k in ("kind", "records", "projects", "has_more", "next_offset")}, "matched": matched, "updated": updated, "unchanged": unchanged, "unknown": unknown, "named_projects": named_projects}
