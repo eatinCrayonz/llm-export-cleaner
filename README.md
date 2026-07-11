@@ -20,6 +20,11 @@ service. Raw exports remain external; the cleaned SQLite library is stored at:
 4. Export either the complete current cleaned corpus or only the latest import's
    new and changed conversations.
 
+The conversation table supports extended selection: `Ctrl+click` toggles rows,
+`Shift+click` selects ranges, and `Ctrl+A` selects every currently displayed
+row. **Export selected...** writes only those conversations, in their visible
+table order, using the active cleaning profile.
+
 The default profile excludes single-exchange conversations and requires two user
 turns, while preserving short Project conversations. Filtering is reversible:
 the canonical cleaned record remains in the database with explicit exclusion

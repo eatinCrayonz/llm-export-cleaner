@@ -191,6 +191,21 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(result["conversations_exported"], 1)
         self.assertEqual(len(history), 2)
 
+    def test_selected_export_uses_requested_conversations_and_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); db = root / "cleaner.sqlite3"; source = root / "two.json"
+            source.write_text(json.dumps([
+                {"uuid": "c1", "name": "First", "chat_messages": [{"uuid": "u1", "sender": "human", "text": "One"}, {"uuid": "a1", "sender": "assistant", "text": "Answer"}]},
+                {"uuid": "c2", "name": "Second", "chat_messages": [{"uuid": "u2", "sender": "human", "text": "Two"}, {"uuid": "a2", "sender": "assistant", "text": "Answer"}]},
+            ]), encoding="utf-8")
+            import_export(provider="claude", input_path=source, database_path=db)
+            save_profile(db, {"name": "All", "exclude_single_exchange": False, "minimum_user_turns": 0})
+            output = root / "selected.json"
+            result = export_cleaned(database_path=db, output_path=output, profile_name="All", included_only=False, selected_keys=[("claude", "c2"), ("claude", "c1")])
+            records = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result["mode"], "selected")
+        self.assertEqual([record["conversation_id"] for record in records], ["c2", "c1"])
+
 
 if __name__ == "__main__":
     unittest.main()

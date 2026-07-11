@@ -16,6 +16,7 @@ def export_cleaned(
     included_only: bool = True, import_id: int | None = None,
     include_attachment_counts: bool = False,
     remove_code: bool | None = None,
+    selected_keys: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     output = output_path.expanduser().resolve()
     if output.suffix.lower() not in {".json", ".jsonl"}:
@@ -43,6 +44,9 @@ def export_cleaned(
                 ORDER BY c.provider,COALESCE(c.created_epoch,0),c.conversation_id""",
             params,
         ).fetchall()
+        if selected_keys is not None:
+            by_key = {(row["provider"], row["conversation_id"]): row for row in rows}
+            rows = [by_key[key] for key in selected_keys if key in by_key]
         records: list[dict[str, Any]] = []
         message_total = 0
         for row in rows:
@@ -95,7 +99,7 @@ def export_cleaned(
         db.close()
     manifest = {
         "generated_at": utc_now(), "profile": profile_name,
-        "mode": "delta" if import_id is not None else "complete",
+        "mode": "selected" if selected_keys is not None else "delta" if import_id is not None else "complete",
         "since_import_id": import_id, "included_only": included_only,
         "source_imports": int(import_stats["count"]), "source_bytes_seen": int(import_stats["bytes"]),
         "conversations_available": total, "conversations_exported": len(records),

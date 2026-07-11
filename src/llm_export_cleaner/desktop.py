@@ -95,6 +95,7 @@ class CleanerApp:
         self.profile_combo.bind("<<ComboboxSelected>>", lambda _e: self._profile_changed())
         ttk.Button(profile, text="Edit profile...", command=self._edit_profile).pack(side="left", padx=(8, 0))
         ttk.Button(profile, text="Export cleaned corpus...", command=self._export).pack(side="left", padx=(8, 0))
+        ttk.Button(profile, text="Export selected...", command=self._export_selected).pack(side="left", padx=(8, 0))
         ttk.Button(profile, text="Export latest changes...", command=lambda: self._export(delta=True)).pack(side="left", padx=(8, 0))
         self.profile_status = ttk.Label(profile, text="")
         self.profile_status.pack(side="left", padx=12)
@@ -113,6 +114,7 @@ class CleanerApp:
         self.tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
         self.tree.bind("<Double-1>", self._open_selected)
+        self.tree.bind("<Control-a>", self._select_all_visible)
         ttk.Label(outer, text="Double-click a conversation to open its cleaned transcript.", foreground="#555").pack(fill="x", pady=(6, 0))
 
     def _optional_provider(self) -> str | None:
@@ -206,6 +208,12 @@ class CleanerApp:
             text.insert("end", f"{'YOU' if message['role']=='user' else 'ASSISTANT'} | {message.get('created_at') or ''}\n{message['text']}\n\n")
         text.configure(state="disabled")
 
+    def _select_all_visible(self, _event: Any = None) -> str:
+        rows = self.tree.get_children("")
+        if rows:
+            self.tree.selection_set(rows)
+        return "break"
+
     def _edit_profile(self) -> None:
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}
         current = {**DEFAULT_PROFILE, **profiles.get(self.profile_name.get(), {})}
@@ -251,6 +259,32 @@ class CleanerApp:
         self._background("export", lambda: export_cleaned(
             database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name.get(),
             included_only=True, import_id=import_id,
+            remove_code=bool(profile.get("remove_generated_code")),
+            include_attachment_counts=bool(profile.get("include_attachment_counts")),
+        ))
+
+    def _export_selected(self) -> None:
+        selected = set(self.tree.selection())
+        keys = []
+        for iid in self.tree.get_children(""):
+            row = self.rows.get(iid) or {}
+            if iid in selected and row.get("provider") and row.get("conversation_id"):
+                keys.append((row["provider"], row["conversation_id"]))
+        if not keys:
+            messagebox.showinfo("Export selected", "Select one or more conversations first.")
+            return
+        output = filedialog.asksaveasfilename(title="Save selected conversations", defaultextension=".jsonl", filetypes=(("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
+        if not output:
+            return
+        profiles = {p["name"]: p for p in list_profiles(self.database_path)}
+        profile = profiles.get(self.profile_name.get())
+        if profile is None:
+            messagebox.showerror("Export selected", "The selected cleaning profile no longer exists.")
+            return
+        self.profile_status.configure(text=f"Exporting {len(keys):,} selected...")
+        self._background("export", lambda: export_cleaned(
+            database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name.get(),
+            included_only=False, selected_keys=keys,
             remove_code=bool(profile.get("remove_generated_code")),
             include_attachment_counts=bool(profile.get("include_attachment_counts")),
         ))
