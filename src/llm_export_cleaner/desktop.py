@@ -6,7 +6,6 @@ import os
 import queue
 import sys
 import threading
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,6 +25,7 @@ from llm_export_cleaner.library import (
     default_database_path, get_conversation, import_export, import_history,
     list_conversations, list_profiles, save_profile, search, stats,
 )
+from llm_export_cleaner.ui import presenters
 
 
 class CleanerApp:
@@ -102,13 +102,10 @@ class CleanerApp:
 
         table = ttk.Frame(outer)
         table.pack(fill="both", expand=True)
-        columns = ("date", "provider", "turns", "project", "title", "match")
-        self.tree = ttk.Treeview(table, columns=columns, show="headings")
-        labels = {"date": "Date (UTC)", "provider": "Provider", "turns": "User turns", "project": "Project", "title": "Conversation", "match": "Match / filter reason"}
-        widths = {"date": 165, "provider": 80, "turns": 75, "project": 90, "title": 300, "match": 430}
-        for column in columns:
-            self.tree.heading(column, text=labels[column], command=lambda selected=column: self._sort_by(selected))
-            self.tree.column(column, width=widths[column], minwidth=60)
+        self.tree = ttk.Treeview(table, columns=presenters.COLUMNS, show="headings")
+        for column in presenters.COLUMNS:
+            self.tree.heading(column, text=presenters.COLUMN_LABELS[column], command=lambda selected=column: self._sort_by(selected))
+            self.tree.column(column, width=presenters.COLUMN_WIDTHS[column], minwidth=60)
         scroll = ttk.Scrollbar(table, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -118,10 +115,10 @@ class CleanerApp:
         ttk.Label(outer, text="Double-click a conversation to open its cleaned transcript.", foreground="#555").pack(fill="x", pady=(6, 0))
 
     def _optional_provider(self) -> str | None:
-        return None if self.provider.get() == "All providers" else self.provider.get()
+        return presenters.provider_filter(self.provider.get())
 
     def _project_filter(self) -> bool | None:
-        return True if self.project.get() == "In a Project" else False if self.project.get() == "Not in a Project" else None
+        return presenters.project_filter(self.project.get())
 
     def _choose_import(self) -> None:
         path = filedialog.askopenfilename(title="Choose provider export", filetypes=(("JSON", "*.json"), ("All files", "*.*")))
@@ -157,38 +154,23 @@ class CleanerApp:
         self._browse()
 
     def _sort_by(self, column: str) -> None:
-        self.sort_descending = not self.sort_descending if self.sort_column == column else False
-        self.sort_column = column
-        values = []
-        for iid in self.tree.get_children(""):
-            raw = self.tree.set(iid, column)
-            if column == "turns":
-                try: key: Any = int(raw)
-                except ValueError: key = -1
-            elif column == "date":
-                try: key = datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
-                except (ValueError, OverflowError): key = float("-inf")
-            else:
-                key = raw.casefold()
-            values.append((key, iid))
+        self.sort_column, self.sort_descending = presenters.toggle_sort(self.sort_column, self.sort_descending, column)
+        values = [
+            (presenters.sort_key(column, self.tree.set(iid, column)), iid)
+            for iid in self.tree.get_children("")
+        ]
         values.sort(key=lambda item: item[0], reverse=self.sort_descending)
         for position, (_key, iid) in enumerate(values):
             self.tree.move(iid, "", position)
-        labels = {"date": "Date (UTC)", "provider": "Provider", "turns": "User turns", "project": "Project", "title": "Conversation", "match": "Match / filter reason"}
-        for name, label in labels.items():
-            suffix = " ▼" if name == column and self.sort_descending else " ▲" if name == column else ""
-            self.tree.heading(name, text=label + suffix)
+        for name, label in presenters.heading_labels(self.sort_column, descending=self.sort_descending).items():
+            self.tree.heading(name, text=label)
 
     def _show_rows(self, rows: list[dict[str, Any]]) -> None:
         self.tree.delete(*self.tree.get_children())
         self.rows.clear()
         for index, row in enumerate(rows):
             iid = f"r{index}"
-            match = row.get("snippet") or (", ".join(row.get("reasons") or []) if not row.get("included", 1) else "Included")
-            self.tree.insert("", "end", iid=iid, values=(
-                row.get("updated_at") or row.get("created_at") or "", row["provider"], row.get("active_user_turn_count", 0),
-                row.get("project_name") or "", row.get("title") or "Untitled", match,
-            ))
+            self.tree.insert("", "end", iid=iid, values=presenters.format_row(row))
             self.rows[iid] = row
 
     def _open_selected(self, _event: Any = None) -> None:
@@ -205,7 +187,7 @@ class CleanerApp:
         text = scrolledtext.ScrolledText(window, wrap="word", padx=14, pady=14)
         text.pack(fill="both", expand=True)
         for message in conversation["messages"]:
-            text.insert("end", f"{'YOU' if message['role']=='user' else 'ASSISTANT'} | {message.get('created_at') or ''}\n{message['text']}\n\n")
+            text.insert("end", presenters.transcript_block(message))
         text.configure(state="disabled")
 
     def _select_all_visible(self, _event: Any = None) -> str:
@@ -267,12 +249,7 @@ class CleanerApp:
         ))
 
     def _export_selected(self) -> None:
-        selected = set(self.tree.selection())
-        keys = []
-        for iid in self.tree.get_children(""):
-            row = self.rows.get(iid) or {}
-            if iid in selected and row.get("provider") and row.get("conversation_id"):
-                keys.append((row["provider"], row["conversation_id"]))
+        keys = presenters.selected_keys(self.tree.get_children(""), self.rows, set(self.tree.selection()))
         if not keys:
             messagebox.showinfo("Export selected", "Select one or more conversations first.")
             return
@@ -366,32 +343,25 @@ class CleanerApp:
                     self.import_button.configure(state="normal")
                     messagebox.showerror("LLM Export Cleaner", str(payload))
                 elif kind == "import-progress":
-                    self.import_status.configure(text=f"Scanning {payload[0]:,}/{payload[1]:,}")
+                    self.import_status.configure(text=presenters.progress_text(*payload))
                 elif kind == "import":
                     self.import_button.configure(state="normal")
-                    self.import_status.configure(text="Already imported" if payload["duplicate_export"] else f"{payload['new_conversations']} new; {payload['changed_conversations']} changed; {payload['unchanged_conversations']} unchanged")
+                    self.import_status.configure(text=presenters.import_status_text(payload))
                     self._refresh_stats(); self._browse()
                 elif kind == "rows": self._show_rows(payload)
                 elif kind == "stats":
-                    self.stats_label.configure(text=f"{payload['conversations']:,} conversations | {payload['messages']:,} messages | {payload['imports']:,} imports")
-                    self.profile_status.configure(text=f"{payload['included']:,} included | {payload['filtered']:,} filtered out")
+                    self.stats_label.configure(text=presenters.stats_text(payload))
+                    self.profile_status.configure(text=presenters.profile_status_text(payload))
                 elif kind == "export":
-                    self.profile_status.configure(text=f"Exported {payload['conversations_exported']:,} conversations ({payload['output_bytes']:,} bytes)")
+                    self.profile_status.configure(text=presenters.export_status_text(payload))
                 elif kind == "claude":
-                    more = f"; more at offset {payload['next_offset']}" if payload["has_more"] else ""
-                    if payload["kind"] == "projects":
-                        status = f"Claude Projects: {payload['named_projects']} names saved{more}"
-                    else:
-                        status = f"Claude Projects: {payload['updated']} updated, {payload['unknown']} unknown{more}"
-                    self.import_status.configure(text=status)
+                    self.import_status.configure(text=presenters.claude_status_text(payload))
                     self._refresh_stats(); self._browse()
                 elif kind == "chatgpt-projects":
-                    more = "; additional cursor page exists" if payload["has_more"] else ""
-                    self.import_status.configure(text=f"ChatGPT Projects: {payload['matched']} matched, {payload['still_unnamed']} still unnamed{more}")
+                    self.import_status.configure(text=presenters.chatgpt_projects_status_text(payload))
                     self._browse()
                 elif kind == "history":
-                    rows = [{"provider": r["provider"], "title": r["source_file"], "updated_at": r["imported_at_utc"], "active_user_turn_count": "import", "project_id": None, "included": 1, "conversation_id": "", "snippet": f"{r['new_conversations']} new; {r['changed_conversations']} changed; {r['unchanged_conversations']} unchanged"} for r in payload]
-                    self._show_rows(rows)
+                    self._show_rows(presenters.history_rows(payload))
         except queue.Empty: pass
         self.root.after(100, self._poll)
 
