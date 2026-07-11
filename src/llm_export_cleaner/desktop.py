@@ -180,18 +180,16 @@ class CleanerApp:
         single = tk.BooleanVar(value=bool(current["exclude_single_exchange"]))
         project_only = tk.BooleanVar(value=bool(current["project_only"]))
         keep_projects = tk.BooleanVar(value=bool(current["keep_short_projects"]))
-        active_only = tk.BooleanVar(value=bool(current["active_branch_only"]))
-        alternatives = tk.BooleanVar(value=bool(current["include_alternatives"]))
         attachments = tk.BooleanVar(value=bool(current["include_attachment_counts"]))
         ttk.Label(frame, text="Profile name").grid(row=0, column=0, sticky="w")
         ttk.Entry(frame, textvariable=name, width=30).grid(row=0, column=1, sticky="w")
         ttk.Label(frame, text="Minimum user turns").grid(row=1, column=0, sticky="w", pady=8)
         ttk.Spinbox(frame, from_=0, to=1000, textvariable=min_turns, width=8).grid(row=1, column=1, sticky="w")
-        options = [("Exclude single-question/single-answer conversations", single), ("Project conversations only", project_only), ("Keep short Project conversations", keep_projects), ("Active branch only", active_only), ("Include alternative branches in exports", alternatives), ("Include attachment counts in exports", attachments)]
+        options = [("Exclude single-question/single-answer conversations", single), ("Project conversations only", project_only), ("Keep short Project conversations", keep_projects), ("Include attachment counts in exports", attachments)]
         for row_index, (label, variable) in enumerate(options, 2):
             ttk.Checkbutton(frame, text=label, variable=variable).grid(row=row_index, column=0, columnspan=2, sticky="w", pady=5)
         def save() -> None:
-            profile = {**current, "name": name.get(), "minimum_user_turns": min_turns.get(), "exclude_single_exchange": single.get(), "project_only": project_only.get(), "keep_short_projects": keep_projects.get(), "active_branch_only": active_only.get(), "include_alternatives": alternatives.get(), "include_attachment_counts": attachments.get()}
+            profile = {**current, "name": name.get(), "minimum_user_turns": min_turns.get(), "exclude_single_exchange": single.get(), "project_only": project_only.get(), "keep_short_projects": keep_projects.get(), "include_attachment_counts": attachments.get()}
             save_profile(self.database_path, profile)
             self.profile_name.set(profile["name"])
             window.destroy()
@@ -212,7 +210,7 @@ class CleanerApp:
         self.profile_status.configure(text="Exporting...")
         self._background("export", lambda: export_cleaned(
             database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name.get(),
-            included_only=True, import_id=import_id, include_alternatives=bool(profile.get("include_alternatives")),
+            included_only=True, import_id=import_id,
             include_attachment_counts=bool(profile.get("include_attachment_counts")),
         ))
 

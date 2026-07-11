@@ -11,11 +11,9 @@ DEFAULT_PROFILE = {
     "minimum_user_turns": 2,
     "project_only": False,
     "keep_short_projects": True,
-    "active_branch_only": True,
     "provider": None,
     "after": None,
     "before": None,
-    "include_alternatives": False,
     "include_attachment_counts": False,
 }
 
@@ -44,4 +42,3 @@ def evaluate_conversation(record: dict[str, Any], profile: dict[str, Any]) -> tu
     if before is not None and (created is None or float(created) >= float(before)):
         reasons.append("after_date_range")
     return not reasons, reasons
-

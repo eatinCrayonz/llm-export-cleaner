@@ -343,13 +343,13 @@ def search(
         db.close()
 
 
-def get_conversation(database_path: Path, provider: str, conversation_id: str, *, include_alternatives: bool = False) -> dict[str, Any]:
+def get_conversation(database_path: Path, provider: str, conversation_id: str) -> dict[str, Any]:
     db = connect(database_path)
     try:
         conversation = db.execute("SELECT * FROM conversations WHERE provider=? AND conversation_id=?", (provider, conversation_id)).fetchone()
         if not conversation:
             raise KeyError("Conversation not found")
-        clause = "" if include_alternatives else " AND is_active_path=1"
+        clause = " AND is_active_path=1"
         messages = db.execute(f"SELECT * FROM messages WHERE provider=? AND conversation_id=?{clause} ORDER BY COALESCE(created_epoch,0),rowid", (provider, conversation_id)).fetchall()
         return dict(conversation) | {"messages": [dict(row) for row in messages]}
     finally:

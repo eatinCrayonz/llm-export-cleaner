@@ -13,7 +13,7 @@ from llm_export_cleaner.library import connect, utc_now
 def export_cleaned(
     *, database_path: Path, output_path: Path, profile_name: str = "Default",
     included_only: bool = True, import_id: int | None = None,
-    include_alternatives: bool = False, include_attachment_counts: bool = False,
+    include_attachment_counts: bool = False,
 ) -> dict[str, Any]:
     output = output_path.expanduser().resolve()
     if output.suffix.lower() not in {".json", ".jsonl"}:
@@ -39,7 +39,7 @@ def export_cleaned(
         records: list[dict[str, Any]] = []
         message_total = 0
         for row in rows:
-            message_clause = "" if include_alternatives else " AND is_active_path=1"
+            message_clause = " AND is_active_path=1"
             messages = db.execute(
                 f"SELECT * FROM messages WHERE provider=? AND conversation_id=?{message_clause} ORDER BY COALESCE(created_epoch,0),rowid",
                 (row["provider"], row["conversation_id"]),
