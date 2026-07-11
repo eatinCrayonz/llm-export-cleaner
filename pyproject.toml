@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-export-cleaner"
+version = "1.0.0"
+description = "Clean, filter, search, and incrementally merge LLM conversation exports"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+llm-export-cleaner = "llm_export_cleaner.cli:main"
+
+[project.gui-scripts]
+llm-export-cleaner-app = "llm_export_cleaner.desktop:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
