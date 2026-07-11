@@ -184,7 +184,7 @@ class CleanerApp:
             match = row.get("snippet") or (", ".join(row.get("reasons") or []) if not row.get("included", 1) else "Included")
             self.tree.insert("", "end", iid=iid, values=(
                 row.get("updated_at") or row.get("created_at") or "", row["provider"], row.get("active_user_turn_count", 0),
-                row.get("project_name") or ("Yes" if row.get("project_id") else "No"), row.get("title") or "Untitled", match,
+                row.get("project_name") or "", row.get("title") or "Untitled", match,
             ))
             self.rows[iid] = row
 
