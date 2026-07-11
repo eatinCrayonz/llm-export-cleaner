@@ -42,6 +42,7 @@ Copy-Item (Join-Path $PythonHome "tcl\tk8.6\*") (Join-Path $Internal "_tk_data")
 foreach ($Runtime in @("_tkinter.pyd", "tcl86t.dll", "tk86t.dll")) { Copy-Item (Join-Path $PythonHome "DLLs\$Runtime") $Internal -Force }
 Copy-Item (Join-Path $PSScriptRoot "Install.ps1") $AppFolder -Force
 Copy-Item (Join-Path $PSScriptRoot "Install.cmd") $AppFolder -Force
+Copy-Item (Join-Path $RepoRoot "README.md") $AppFolder -Force
 
 $Archive = Join-Path $DistRoot "LLMExportCleaner-Windows.zip"
 if (Test-Path $Archive) { Remove-Item -LiteralPath $Archive -Force }

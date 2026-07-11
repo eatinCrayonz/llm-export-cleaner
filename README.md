@@ -38,6 +38,83 @@ SQLite FTS5 indexes titles plus user and assistant text. Search defaults to the
 selected profile's included corpus; **Include filtered-out** reveals excluded
 conversations and their reasons.
 
+## Recovering Project names and membership
+
+Consumer exports do not consistently include human-readable Project names.
+The cleaner therefore accepts small JSON responses copied from the provider's
+own signed-in web application. This is manual, local, and requires no API key,
+Enterprise account, console script, or browser extension.
+
+### Browser Network workflow
+
+1. Open the provider's normal web application while signed in.
+2. Press **F12** to open Developer Tools.
+3. Select **Network**.
+4. Select the **Fetch/XHR** request category.
+5. Enable **Preserve log** if navigating or scrolling will change pages.
+6. Reload the page so its requests appear.
+7. Use the Network filter box to find the request described below.
+8. Click the request, open its **Response** tab, select all of the JSON, and
+   copy it. In browsers that offer it, right-clicking the request and choosing
+   **Copy > Copy response** is equivalent.
+9. In LLM Export Cleaner, click **Claude Project page...**, paste the response,
+   and click **Import page**.
+
+Do not paste JavaScript into the browser console. The browser warning about
+pasting code is irrelevant to this workflow because only response JSON is being
+copied out of Developer Tools and into the local cleaner.
+
+### Claude Project names
+
+On the main Claude page, filter Network requests for `projects_v2`. The active
+Project catalog request has this recognizable form:
+
+```text
+projects_v2?limit=30&offset=0&filter=is_creator&order_by=updated_at&searchQuery=&is_archived=false
+```
+
+Claude may also issue an `is_archived=true` request. Use the
+`is_archived=false` response for active Projects. Its JSON contains a `data`
+array with records shaped like:
+
+```json
+{
+  "uuid": "019d98e6-bc5d-73eb-9115-9e23d585f538",
+  "name": "Mr Thinker"
+}
+```
+
+The cleaner stores this as the Project UUID-to-name lookup. Confirm that
+`pagination.has_more` is `false`; otherwise copy and import each subsequent
+offset page as well.
+
+### Claude conversation-to-Project membership
+
+Open a Claude Project and filter Network requests for `conversations_v2`.
+Scroll the conversation list until it finishes loading, copying each paginated
+response. Import each response through **Claude Project page...**. The cleaner
+uses each conversation's `uuid` and `project_uuid`; it ignores summaries,
+settings, permissions, and other website metadata.
+
+The two Claude response types solve separate halves of the lookup:
+
+```text
+projects_v2       Project UUID -> Project name
+conversations_v2  Conversation UUID -> Project UUID
+```
+
+### ChatGPT Projects
+
+ChatGPT exports commonly provide Project membership as `gizmo_id` values such
+as `g-p-...`, but not Project names. The signed-in ChatGPT Project/sidebar
+catalog supplies the missing `gizmo.id` to `gizmo.display.name` lookup. Until a
+catalog response is imported, use **Project names...** to identify UUIDs from
+example conversations and assign their names manually.
+
+These copied responses can contain account identifiers and other private
+metadata. Do not publish them. The cleaner extracts only the identifiers and
+names needed for local Project matching.
+
 ## Clean exports
 
 JSON and JSONL outputs contain only the documented canonical fields. Every
@@ -53,4 +130,3 @@ See [the canonical schema](docs/canonical-schema.md) and
 python -m unittest discover -s tests -v
 python -m llm_export_cleaner.cli --help
 ```
-
