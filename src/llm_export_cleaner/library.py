@@ -499,18 +499,3 @@ def list_projects(database_path: Path) -> list[dict[str, Any]]:
     finally:
         db.close()
 
-
-def save_project_name(database_path: Path, provider: str, project_id: str, name: str) -> None:
-    cleaned = name.strip()
-    if not cleaned:
-        raise ValueError("Project name cannot be empty")
-    db = connect(database_path)
-    try:
-        with db:
-            db.execute(
-                "INSERT INTO projects(provider,project_id,name) VALUES(?,?,?) "
-                "ON CONFLICT(provider,project_id) DO UPDATE SET name=excluded.name",
-                (provider, project_id, cleaned),
-            )
-    finally:
-        db.close()

@@ -124,9 +124,7 @@ items[].gizmo.gizmo.display.name
 Some versions may omit one `gizmo` wrapper; the importer accepts both shapes.
 If the response has a non-null `cursor`, capture and import subsequent cursor
 pages. The app reports how many Project IDs matched the imported ChatGPT export
-and how many remain unnamed. For an individual missing Project, the fallback
-request is `/backend-api/gizmos/{gizmo_id}`; its ID and display name can also be
-entered through **Project names...**.
+and how many remain unnamed.
 
 These copied responses can contain account identifiers and other private
 metadata. Do not publish them. The cleaner extracts only the identifiers and
