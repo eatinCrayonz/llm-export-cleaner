@@ -14,9 +14,10 @@ from typing import Any, Callable
 from llm_export_cleaner.filters import DEFAULT_PROFILE, evaluate_conversation
 from llm_export_cleaner.normalizers import Audit, NORMALIZERS
 from llm_export_cleaner.timestamps import date_boundary, timestamp_epoch
+from llm_export_cleaner.text_cleaning import clean_text
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
@@ -86,6 +87,10 @@ def connect(path: Path) -> sqlite3.Connection:
         db.execute("UPDATE meta SET value='2' WHERE key='schema_version'")
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if current and int(current["value"]) == 2:
+        db.execute("UPDATE meta SET value='3' WHERE key='schema_version'")
+        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    if current and int(current["value"]) == 3:
+        _migrate_clean_text(db)
         db.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if not current or int(current["value"]) != SCHEMA_VERSION:
@@ -94,6 +99,34 @@ def connect(path: Path) -> sqlite3.Connection:
     ensure_default_profile(db)
     db.commit()
     return db
+
+
+def _migrate_clean_text(db: sqlite3.Connection) -> None:
+    rows = db.execute("SELECT provider,conversation_id,message_id,text FROM messages").fetchall()
+    for row in rows:
+        cleaned = clean_text(row["text"])
+        key = (row["provider"], row["conversation_id"], row["message_id"])
+        if cleaned is None:
+            db.execute("DELETE FROM messages WHERE provider=? AND conversation_id=? AND message_id=?", key)
+        elif cleaned != row["text"]:
+            db.execute("UPDATE messages SET text=? WHERE provider=? AND conversation_id=? AND message_id=?", (cleaned, *key))
+    conversations = db.execute("SELECT provider,conversation_id,title FROM conversations").fetchall()
+    db.execute("DELETE FROM conversation_fts")
+    for conversation in conversations:
+        messages = db.execute(
+            "SELECT role,text FROM messages WHERE provider=? AND conversation_id=? ORDER BY COALESCE(created_epoch,0),rowid",
+            (conversation["provider"], conversation["conversation_id"]),
+        ).fetchall()
+        count = len(messages)
+        user_turns = sum(message["role"] == "user" for message in messages)
+        db.execute(
+            "UPDATE conversations SET message_count=?,active_message_count=?,active_user_turn_count=?,alternative_message_count=0 WHERE provider=? AND conversation_id=?",
+            (count, count, user_turns, conversation["provider"], conversation["conversation_id"]),
+        )
+        db.execute(
+            "INSERT INTO conversation_fts(provider,conversation_id,title,text) VALUES(?,?,?,?)",
+            (conversation["provider"], conversation["conversation_id"], conversation["title"] or "", "\n\n".join(message["text"] for message in messages)),
+        )
 
 
 def _migrate_to_final_branches_only(db: sqlite3.Connection) -> None:

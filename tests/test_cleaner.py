@@ -15,6 +15,16 @@ from llm_export_cleaner.library import (  # noqa: E402
     list_projects, save_profile, save_project_name, search, stats,
 )
 from llm_export_cleaner.normalizers import Audit, normalize_chatgpt, normalize_claude, normalize_grok  # noqa: E402
+from llm_export_cleaner.text_cleaning import clean_text  # noqa: E402
+
+
+class TextCleaningTests(unittest.TestCase):
+    def test_repairs_mojibake_and_removes_chatgpt_artifacts_and_emoji(self) -> None:
+        value = "It isnâ€™t official. îˆ€citeîˆ‚turn0search0îˆ **îˆ€entityîˆ‚[\"movie\",\"The Good\",\"film\"]îˆ** 🎬"
+        self.assertEqual(clean_text(value), "It isn’t official. **The Good**")
+
+    def test_drops_internal_tool_payload(self) -> None:
+        self.assertIsNone(clean_text('{"search_query":[{"q":"example"}],"response_length":"short"}'))
 
 
 class NormalizerTests(unittest.TestCase):

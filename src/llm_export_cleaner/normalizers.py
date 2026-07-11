@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from llm_export_cleaner.timestamps import timestamp_utc
+from llm_export_cleaner.text_cleaning import clean_text
 
 
 @dataclass
@@ -33,8 +34,7 @@ def _text(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
-        cleaned = value.strip()
-        return cleaned or None
+        return clean_text(value)
     return None
 
 
@@ -53,7 +53,7 @@ def _content_text(content: Any) -> str | None:
                 candidate = _text(part.get("text"))
                 if candidate:
                     values.append(candidate)
-        return "\n\n".join(values) or None
+        return clean_text("\n\n".join(values)) if values else None
     return _text(content.get("text"))
 
 
