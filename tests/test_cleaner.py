@@ -18,7 +18,7 @@ from llm_export_cleaner.normalizers import Audit, normalize_chatgpt, normalize_c
 
 
 class NormalizerTests(unittest.TestCase):
-    def test_chatgpt_preserves_active_path_alternative_and_project(self) -> None:
+    def test_chatgpt_discards_alternative_branch_and_preserves_project(self) -> None:
         payload = [{
             "conversation_id": "c1", "title": "Branched", "current_node": "a2",
             "gizmo_type": "snorlax", "gizmo_id": "g-p-project",
@@ -31,7 +31,9 @@ class NormalizerTests(unittest.TestCase):
         audit = Audit()
         record = list(normalize_chatgpt(payload, audit))[0]
         self.assertEqual(record["project_id"], "g-p-project")
-        self.assertEqual(sum(m["is_alternative"] for m in record["messages"]), 1)
+        self.assertEqual([m["text"] for m in record["messages"]], ["Question", "Current answer"])
+        self.assertEqual(sum(m["is_alternative"] for m in record["messages"]), 0)
+        self.assertEqual(audit.exclusion_reasons["alternative_branch"], 1)
         self.assertEqual(record["active_leaf_message_id"], "a2")
 
     def test_claude_and_grok_minimal_shapes(self) -> None:

@@ -119,6 +119,9 @@ def normalize_chatgpt(data: Any, audit: Audit) -> Iterable[dict[str, Any]]:
             if not isinstance(message, dict):
                 continue
             audit.messages_seen += 1
+            if current and str(node_id) not in active_nodes:
+                audit.exclusion_reasons["alternative_branch"] += 1
+                continue
             role = str((message.get("author") or {}).get("role") or "").lower()
             if role not in {"user", "assistant"}:
                 audit.exclusion_reasons["non_conversation_role"] += 1
@@ -138,13 +141,12 @@ def normalize_chatgpt(data: Any, audit: Audit) -> Iterable[dict[str, Any]]:
                 seen.add(parent_node)
                 parent = mapping[parent_node].get("parent")
                 parent_node = str(parent) if parent else None
-            active = node_id in active_nodes if current else True
             messages.append(_message(
                 provider="chatgpt", conversation_id=conversation_id,
                 message_id=item["id"], parent_id=retained.get(parent_node),
                 role=item["role"], text=item["text"],
-                created_at=item["raw"].get("create_time"), active=active,
-                alternative=not active,
+                created_at=item["raw"].get("create_time"), active=True,
+                alternative=False,
                 attachment_count=sum(isinstance(p, dict) for p in ((item["raw"].get("content") or {}).get("parts") or [])),
             ))
         if not messages:

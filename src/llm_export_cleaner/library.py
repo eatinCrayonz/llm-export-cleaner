@@ -16,7 +16,7 @@ from llm_export_cleaner.normalizers import Audit, NORMALIZERS
 from llm_export_cleaner.timestamps import date_boundary, timestamp_epoch
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
@@ -76,14 +76,46 @@ def connect(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(resolved)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
-    db.execute("INSERT OR IGNORE INTO meta VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
+    db.execute("INSERT OR IGNORE INTO meta VALUES('schema_version','1')")
     current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    if current and int(current["value"]) == 1:
+        _migrate_to_final_branches_only(db)
+        db.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
+        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if not current or int(current["value"]) != SCHEMA_VERSION:
         db.close()
         raise ValueError("Unsupported cleaner database schema")
     ensure_default_profile(db)
     db.commit()
     return db
+
+
+def _migrate_to_final_branches_only(db: sqlite3.Connection) -> None:
+    affected = db.execute(
+        "SELECT DISTINCT provider,conversation_id FROM messages WHERE is_active_path=0 OR is_alternative=1"
+    ).fetchall()
+    db.execute("DELETE FROM messages WHERE is_active_path=0 OR is_alternative=1")
+    for row in affected:
+        provider, conversation_id = row["provider"], row["conversation_id"]
+        messages = db.execute(
+            "SELECT text,role FROM messages WHERE provider=? AND conversation_id=? ORDER BY COALESCE(created_epoch,0),rowid",
+            (provider, conversation_id),
+        ).fetchall()
+        count = len(messages)
+        user_turns = sum(message["role"] == "user" for message in messages)
+        db.execute(
+            "UPDATE conversations SET message_count=?,active_message_count=?,active_user_turn_count=?,alternative_message_count=0 WHERE provider=? AND conversation_id=?",
+            (count, count, user_turns, provider, conversation_id),
+        )
+        conversation = db.execute(
+            "SELECT title FROM conversations WHERE provider=? AND conversation_id=?", (provider, conversation_id)
+        ).fetchone()
+        db.execute("DELETE FROM conversation_fts WHERE provider=? AND conversation_id=?", (provider, conversation_id))
+        if conversation:
+            db.execute(
+                "INSERT INTO conversation_fts(provider,conversation_id,title,text) VALUES(?,?,?,?)",
+                (provider, conversation_id, conversation["title"] or "", "\n\n".join(message["text"] for message in messages)),
+            )
 
 
 def ensure_default_profile(db: sqlite3.Connection) -> int:
