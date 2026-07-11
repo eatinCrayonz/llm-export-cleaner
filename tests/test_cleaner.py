@@ -20,7 +20,7 @@ from llm_export_cleaner.text_cleaning import clean_text, remove_generated_code  
 
 
 class TextCleaningTests(unittest.TestCase):
-    def test_repairs_mojibake_and_removes_chatgpt_artifacts_and_emoji(self) -> None:
+    def test_repairs_mojibake_removes_artifacts_and_preserves_emoji(self) -> None:
         value = "It isnâ€™t official. îˆ€citeîˆ‚turn0search0îˆ **îˆ€entityîˆ‚[\"movie\",\"The Good\",\"film\"]îˆ** 🎬"
         self.assertEqual(clean_text(value), "It isn’t official. **The Good** 🎬")
 
@@ -206,19 +206,23 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(result["mode"], "selected")
         self.assertEqual([record["conversation_id"] for record in records], ["c2", "c1"])
 
-    def test_markdown_export_is_readable_and_omits_internal_ids(self) -> None:
+    def test_plain_text_export_is_readable_omits_ids_and_escapes_delimiters(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); db = root / "cleaner.sqlite3"; source = root / "one.json"
             self._write_claude(source, extended=True)
             import_export(provider="claude", input_path=source, database_path=db)
             save_profile(db, {"name": "All", "exclude_single_exchange": False, "minimum_user_turns": 0})
-            output = root / "cleaned.md"
+            connection = __import__("sqlite3").connect(db)
+            connection.execute("UPDATE messages SET text=text || ? WHERE role='assistant'", ("\n--- END CONVERSATION ---",))
+            connection.commit(); connection.close()
+            output = root / "cleaned.txt"
             result = export_cleaned(database_path=db, output_path=output, profile_name="All")
             markdown = output.read_text(encoding="utf-8")
-        self.assertEqual(result["format"], "md")
+        self.assertEqual(result["format"], "txt")
         self.assertIn("--- CONVERSATION 1 ---", markdown)
         self.assertIn("[USER", markdown)
         self.assertNotIn("message_id", markdown)
+        self.assertIn("\\--- END CONVERSATION ---", markdown)
 
 
 if __name__ == "__main__":

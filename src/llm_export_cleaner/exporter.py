@@ -19,8 +19,8 @@ def export_cleaned(
     selected_keys: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     output = output_path.expanduser().resolve()
-    if output.suffix.lower() not in {".json", ".jsonl", ".md"}:
-        raise ValueError("Output must end in .json, .jsonl, or .md")
+    if output.suffix.lower() not in {".json", ".jsonl", ".md", ".txt"}:
+        raise ValueError("Output must end in .txt, .md, .json, or .jsonl")
     output.parent.mkdir(parents=True, exist_ok=True)
     db = connect(database_path)
     clauses = ["p.name=?"]
@@ -81,7 +81,7 @@ def export_cleaned(
             }
             records.append(record)
             message_total += len(clean_messages)
-        if output.suffix.lower() == ".md":
+        if output.suffix.lower() in {".md", ".txt"}:
             with output.open("w", encoding="utf-8", newline="\n") as handle:
                 for index, record in enumerate(records, 1):
                     handle.write(f"--- CONVERSATION {index} ---\n")
@@ -94,7 +94,11 @@ def export_cleaned(
                     for message in record["messages"]:
                         label = "USER" if message["role"] == "user" else "ASSISTANT"
                         timestamp = f" | {message['created_at']}" if message.get("created_at") else ""
-                        handle.write(f"[{label}{timestamp}]\n{message['text']}\n\n")
+                        body = "\n".join(
+                            "\\" + line if line.startswith("--- CONVERSATION ") or line.startswith("--- END CONVERSATION") else line
+                            for line in message["text"].splitlines()
+                        )
+                        handle.write(f"[{label}{timestamp}]\n{body}\n\n")
                     handle.write("--- END CONVERSATION ---\n\n")
         elif output.suffix.lower() == ".jsonl":
             with output.open("w", encoding="utf-8", newline="\n") as handle:

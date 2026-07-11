@@ -248,11 +248,14 @@ class CleanerApp:
         ttk.Button(frame, text="Cancel", command=window.destroy).grid(row=9, column=1, pady=18, sticky="e")
 
     def _export(self, delta: bool = False) -> None:
-        output = filedialog.asksaveasfilename(title="Save cleaned corpus", defaultextension=".md", filetypes=(("Markdown transcript", "*.md"), ("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
+        output = filedialog.asksaveasfilename(title="Save cleaned corpus", defaultextension=".txt", filetypes=(("Plain text transcript", "*.txt"), ("Markdown transcript", "*.md"), ("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
         if not output:
             return
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}
-        profile = profiles[self.profile_name.get()]
+        profile = profiles.get(self.profile_name.get())
+        if profile is None:
+            messagebox.showerror("Export cleaned corpus", "The selected cleaning profile no longer exists.")
+            return
         history = import_history(self.database_path, 1)
         import_id = int(history[0]["import_id"]) if delta and history else None
         self.profile_status.configure(text="Exporting...")
@@ -273,7 +276,7 @@ class CleanerApp:
         if not keys:
             messagebox.showinfo("Export selected", "Select one or more conversations first.")
             return
-        output = filedialog.asksaveasfilename(title="Save selected conversations", defaultextension=".md", filetypes=(("Markdown transcript", "*.md"), ("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
+        output = filedialog.asksaveasfilename(title="Save selected conversations", defaultextension=".txt", filetypes=(("Plain text transcript", "*.txt"), ("Markdown transcript", "*.md"), ("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
         if not output:
             return
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}

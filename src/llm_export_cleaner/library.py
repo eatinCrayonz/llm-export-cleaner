@@ -17,7 +17,7 @@ from llm_export_cleaner.timestamps import date_boundary, timestamp_epoch
 from llm_export_cleaner.text_cleaning import clean_text, remove_generated_code
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
@@ -95,6 +95,10 @@ def connect(path: Path) -> sqlite3.Connection:
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if current and int(current["value"]) == 4:
         _repair_record_hashes(db)
+        db.execute("UPDATE meta SET value='5' WHERE key='schema_version'")
+        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    if current and int(current["value"]) == 5:
+        _repair_record_hashes(db)
         db.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if not current or int(current["value"]) != SCHEMA_VERSION:
@@ -165,7 +169,7 @@ def _repair_record_hashes(db: sqlite3.Connection) -> None:
             "title": conversation["title"], "created_at": conversation["created_at"],
             "updated_at": conversation["updated_at"], "project_id": conversation["project_id"],
             "active_leaf_message_id": conversation["active_leaf_message_id"], **metrics,
-            "message_hashes": message_hashes,
+            "message_hashes": sorted(message_hashes),
         }
         db.execute(
             "UPDATE conversations SET record_hash=? WHERE provider=? AND conversation_id=?",
@@ -286,7 +290,7 @@ def _merge_conversation(db: sqlite3.Connection, record: dict[str, Any], import_i
     provider, conversation_id = record["provider"], str(record["conversation_id"])
     metrics = _conversation_metrics(record)
     conversation_payload = {k: v for k, v in record.items() if k != "messages"} | metrics
-    record_hash = stable_hash(conversation_payload | {"message_hashes": [stable_hash(m) for m in record["messages"]]})
+    record_hash = stable_hash(conversation_payload | {"message_hashes": sorted(stable_hash(m) for m in record["messages"])})
     existing = db.execute("SELECT record_hash,project_id,updated_epoch FROM conversations WHERE provider=? AND conversation_id=?", (provider, conversation_id)).fetchone()
     incoming_updated = timestamp_epoch(record.get("updated_at"))
     if existing is not None and existing["updated_epoch"] is not None and (
