@@ -42,6 +42,7 @@ class CleanerApp:
         self._build()
         self._refresh_profiles()
         self._refresh_stats()
+        self._browse()
         root.after(100, self._poll)
 
     def _build(self) -> None:

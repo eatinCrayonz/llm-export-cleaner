@@ -88,7 +88,6 @@ def connect(path: Path) -> sqlite3.Connection:
     if current and int(current["value"]) == 2:
         db.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
-        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if not current or int(current["value"]) != SCHEMA_VERSION:
         db.close()
         raise ValueError("Unsupported cleaner database schema")
@@ -243,6 +242,14 @@ def _merge_conversation(db: sqlite3.Connection, record: dict[str, Any], import_i
         )
         stats["changed_conversations"] += 1
     changed = existing is None or existing["record_hash"] != record_hash
+    if changed and existing is not None:
+        incoming_ids = [str(message["message_id"]) for message in record["messages"]]
+        placeholders = ",".join("?" for _ in incoming_ids)
+        removed = db.execute(
+            f"DELETE FROM messages WHERE provider=? AND conversation_id=? AND message_id NOT IN ({placeholders})",
+            (provider, conversation_id, *incoming_ids),
+        ).rowcount
+        stats["changed_messages"] += max(removed, 0)
     for message in record["messages"]:
         _merge_message(db, message, import_id, stats)
     if changed:
@@ -345,8 +352,8 @@ def search(
     if not tokens:
         return []
     fts = " AND ".join(f'"{token}"' for token in tokens)
-    clauses = ["conversation_fts MATCH ?", "p.name=?"]
-    params: list[Any] = [fts, profile_name]
+    clauses = ["conversation_fts MATCH ?"]
+    params: list[Any] = [profile_name, fts]
     if not include_filtered:
         clauses.append("r.included=1")
     if provider:
@@ -374,9 +381,9 @@ def search(
                 JOIN conversations c USING(provider,conversation_id)
                 JOIN cleaning_profiles p ON p.name=?
                 JOIN filter_results r ON r.profile_id=p.profile_id AND r.provider=c.provider AND r.conversation_id=c.conversation_id
-                WHERE {' AND '.join([clauses[0]] + clauses[2:])}
+                WHERE {' AND '.join(clauses)}
                 ORDER BY bm25(conversation_fts,0,0,1,1),COALESCE(c.updated_epoch,0) DESC LIMIT ?""",
-            [profile_name, fts, *params[2:]],
+            params,
         ).fetchall()
         return [dict(row) | {"reasons": json.loads(row["reasons_json"])} for row in rows]
     finally:

@@ -100,6 +100,21 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(conversation["title"], "Evolution")
         self.assertEqual(len(conversation["messages"]), 4)
 
+    def test_changed_conversation_removes_messages_missing_from_new_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); db = root / "cleaner.sqlite3"; first = root / "first.json"; second = root / "second.json"
+            first.write_text(json.dumps([{"uuid": "c1", "name": "Edited", "updated_at": "2025-02-01T00:00:00Z", "chat_messages": [{"uuid": "u1", "sender": "human", "text": "Question"}, {"uuid": "a1", "sender": "assistant", "text": "Old answer"}, {"uuid": "u2", "sender": "human", "text": "Follow-up"}]}]), encoding="utf-8")
+            second.write_text(json.dumps([{"uuid": "c1", "name": "Edited", "updated_at": "2025-03-01T00:00:00Z", "chat_messages": [{"uuid": "u1", "sender": "human", "text": "Question"}, {"uuid": "a2", "sender": "assistant", "text": "Replacement answer"}]}]), encoding="utf-8")
+            import_export(provider="claude", input_path=first, database_path=db)
+            import_export(provider="claude", input_path=second, database_path=db)
+            conversation = get_conversation(db, "claude", "c1")
+            save_profile(db, {"name": "All", "exclude_single_exchange": False, "minimum_user_turns": 0})
+            output = root / "clean.json"
+            export_cleaned(database_path=db, output_path=output, profile_name="All")
+            exported = json.loads(output.read_text(encoding="utf-8"))[0]
+        self.assertEqual([message["text"] for message in conversation["messages"]], ["Question", "Replacement answer"])
+        self.assertEqual([message["text"] for message in exported["messages"]], ["Question", "Replacement answer"])
+
     def test_claude_project_page_updates_exact_uuid(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); db = root / "cleaner.sqlite3"; export = root / "one.json"
