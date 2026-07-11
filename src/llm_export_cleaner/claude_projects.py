@@ -53,6 +53,12 @@ def apply_page(*, database_path: Any, page_text: str) -> dict[str, Any]:
     matched = updated = unchanged = unknown = 0
     try:
         with db:
+            for project_id, name in parsed["project_names"].items():
+                db.execute(
+                    "INSERT INTO projects(provider,project_id,name) VALUES('claude',?,?) "
+                    "ON CONFLICT(provider,project_id) DO UPDATE SET name=excluded.name",
+                    (project_id, name),
+                )
             for conversation_id, project_id in parsed["assignments"].items():
                 row = db.execute("SELECT project_id FROM conversations WHERE provider='claude' AND conversation_id=?", (conversation_id,)).fetchone()
                 if row is None:
@@ -68,4 +74,3 @@ def apply_page(*, database_path: Any, page_text: str) -> dict[str, Any]:
     finally:
         db.close()
     return {**{k: parsed[k] for k in ("records", "projects", "has_more", "next_offset")}, "matched": matched, "updated": updated, "unchanged": unchanged, "unknown": unknown}
-

@@ -6,6 +6,7 @@ import os
 import queue
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -32,6 +33,8 @@ class CleanerApp:
         self.database_path = database_path or default_database_path()
         self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.rows: dict[str, dict[str, Any]] = {}
+        self.sort_column: str | None = None
+        self.sort_descending = False
         self.profile_name = tk.StringVar(value="Default")
         root.title("LLM Export Cleaner")
         root.geometry("1180x720")
@@ -78,7 +81,8 @@ class CleanerApp:
         self.include_filtered = tk.BooleanVar(value=False)
         ttk.Checkbutton(find, text="Include filtered-out", variable=self.include_filtered).grid(row=0, column=3, padx=5)
         ttk.Button(find, text="Search", command=self._search).grid(row=0, column=4, padx=5)
-        ttk.Button(find, text="Browse", command=self._browse).grid(row=0, column=5)
+        ttk.Button(find, text="Clear search", command=self._clear_search).grid(row=0, column=5, padx=(0, 5))
+        ttk.Button(find, text="Browse", command=self._browse).grid(row=0, column=6)
         find.columnconfigure(0, weight=1)
 
         profile = ttk.LabelFrame(outer, text="Cleaning profile", padding=10)
@@ -99,7 +103,7 @@ class CleanerApp:
         labels = {"date": "Date (UTC)", "provider": "Provider", "turns": "User turns", "project": "Project", "title": "Conversation", "match": "Match / filter reason"}
         widths = {"date": 165, "provider": 80, "turns": 75, "project": 90, "title": 300, "match": 430}
         for column in columns:
-            self.tree.heading(column, text=labels[column])
+            self.tree.heading(column, text=labels[column], command=lambda selected=column: self._sort_by(selected))
             self.tree.column(column, width=widths[column], minwidth=60)
         scroll = ttk.Scrollbar(table, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
@@ -140,6 +144,36 @@ class CleanerApp:
             provider=self._optional_provider(), in_project=self._project_filter(),
         ))
 
+    def _clear_search(self) -> None:
+        self.query.set("")
+        self.provider.set("All providers")
+        self.project.set("All conversations")
+        self.include_filtered.set(False)
+        self._browse()
+
+    def _sort_by(self, column: str) -> None:
+        self.sort_descending = not self.sort_descending if self.sort_column == column else False
+        self.sort_column = column
+        values = []
+        for iid in self.tree.get_children(""):
+            raw = self.tree.set(iid, column)
+            if column == "turns":
+                try: key: Any = int(raw)
+                except ValueError: key = -1
+            elif column == "date":
+                try: key = datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+                except (ValueError, OverflowError): key = float("-inf")
+            else:
+                key = raw.casefold()
+            values.append((key, iid))
+        values.sort(key=lambda item: item[0], reverse=self.sort_descending)
+        for position, (_key, iid) in enumerate(values):
+            self.tree.move(iid, "", position)
+        labels = {"date": "Date (UTC)", "provider": "Provider", "turns": "User turns", "project": "Project", "title": "Conversation", "match": "Match / filter reason"}
+        for name, label in labels.items():
+            suffix = " ▼" if name == column and self.sort_descending else " ▲" if name == column else ""
+            self.tree.heading(name, text=label + suffix)
+
     def _show_rows(self, rows: list[dict[str, Any]]) -> None:
         self.tree.delete(*self.tree.get_children())
         self.rows.clear()
@@ -148,7 +182,7 @@ class CleanerApp:
             match = row.get("snippet") or (", ".join(row.get("reasons") or []) if not row.get("included", 1) else "Included")
             self.tree.insert("", "end", iid=iid, values=(
                 row.get("updated_at") or row.get("created_at") or "", row["provider"], row.get("active_user_turn_count", 0),
-                "Yes" if row.get("project_id") else "No", row.get("title") or "Untitled", match,
+                row.get("project_name") or ("Yes" if row.get("project_id") else "No"), row.get("title") or "Untitled", match,
             ))
             self.rows[iid] = row
 

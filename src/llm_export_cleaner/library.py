@@ -16,7 +16,7 @@ from llm_export_cleaner.normalizers import Audit, NORMALIZERS
 from llm_export_cleaner.timestamps import date_boundary, timestamp_epoch
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS messages(
  first_import_id INTEGER NOT NULL, last_import_id INTEGER NOT NULL,
  PRIMARY KEY(provider,conversation_id,message_id),
  FOREIGN KEY(provider,conversation_id) REFERENCES conversations(provider,conversation_id));
+CREATE TABLE IF NOT EXISTS projects(
+ provider TEXT NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL,
+ PRIMARY KEY(provider,project_id));
 CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts5(
  provider UNINDEXED, conversation_id UNINDEXED, title, text, tokenize='unicode61');
 CREATE TABLE IF NOT EXISTS cleaning_profiles(
@@ -80,7 +83,11 @@ def connect(path: Path) -> sqlite3.Connection:
     current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if current and int(current["value"]) == 1:
         _migrate_to_final_branches_only(db)
+        db.execute("UPDATE meta SET value='2' WHERE key='schema_version'")
+        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    if current and int(current["value"]) == 2:
         db.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
+        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if not current or int(current["value"]) != SCHEMA_VERSION:
         db.close()
@@ -361,6 +368,7 @@ def search(
     try:
         rows = db.execute(
             f"""SELECT c.*,r.included,r.reasons_json,
+                (SELECT name FROM projects x WHERE x.provider=c.provider AND x.project_id=c.project_id) project_name,
                 snippet(conversation_fts,3,'[',']',' ... ',24) snippet
                 FROM conversation_fts
                 JOIN conversations c USING(provider,conversation_id)
@@ -407,7 +415,9 @@ def list_conversations(
     db = connect(database_path)
     try:
         rows = db.execute(
-            f"""SELECT c.*,r.included,r.reasons_json FROM conversations c
+            f"""SELECT c.*,r.included,r.reasons_json,
+                (SELECT name FROM projects x WHERE x.provider=c.provider AND x.project_id=c.project_id) project_name
+                FROM conversations c
                 JOIN cleaning_profiles p ON p.name=?
                 JOIN filter_results r ON r.profile_id=p.profile_id AND r.provider=c.provider AND r.conversation_id=c.conversation_id
                 WHERE {' AND '.join(clauses) if clauses else '1=1'}

@@ -112,6 +112,7 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(parsed["projects"], 1)
         self.assertEqual(result["updated"], 1)
         self.assertEqual(rows[0]["project_id"], "p1")
+        self.assertEqual(rows[0]["project_name"], "Research")
 
     def test_delta_export_uses_import_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
