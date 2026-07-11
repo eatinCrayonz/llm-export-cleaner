@@ -12,7 +12,7 @@ from llm_export_cleaner.claude_projects import apply_page, parse_page  # noqa: E
 from llm_export_cleaner.exporter import export_cleaned  # noqa: E402
 from llm_export_cleaner.library import (  # noqa: E402
     get_conversation, import_export, import_history, list_conversations,
-    save_profile, search, stats,
+    list_projects, save_profile, save_project_name, search, stats,
 )
 from llm_export_cleaner.normalizers import Audit, normalize_chatgpt, normalize_claude, normalize_grok  # noqa: E402
 
@@ -113,6 +113,17 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(result["updated"], 1)
         self.assertEqual(rows[0]["project_id"], "p1")
         self.assertEqual(rows[0]["project_name"], "Research")
+
+    def test_manual_project_name_is_available_to_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); db = root / "cleaner.sqlite3"; export = root / "one.json"
+            self._write_claude(export, extended=True)
+            import_export(provider="claude", input_path=export, database_path=db)
+            apply_page(database_path=db, page_text=json.dumps({"data": [{"uuid": "c1", "project_uuid": "p1"}], "has_more": False}))
+            save_project_name(db, "claude", "p1", "My research")
+            projects = list_projects(db); rows = list_conversations(database_path=db, in_project=True)
+        self.assertEqual(projects[0]["name"], "My research")
+        self.assertEqual(rows[0]["project_name"], "My research")
 
     def test_delta_export_uses_import_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

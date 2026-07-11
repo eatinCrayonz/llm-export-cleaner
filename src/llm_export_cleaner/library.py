@@ -435,3 +435,42 @@ def import_history(database_path: Path, limit: int = 100) -> list[dict[str, Any]
         return [dict(row) for row in db.execute("SELECT * FROM imports ORDER BY import_id DESC LIMIT ?", (limit,))]
     finally:
         db.close()
+
+
+def list_projects(database_path: Path) -> list[dict[str, Any]]:
+    db = connect(database_path)
+    try:
+        rows = db.execute(
+            """SELECT c.provider,c.project_id,COALESCE(p.name,'') name,COUNT(*) conversation_count
+               FROM conversations c LEFT JOIN projects p
+                 ON p.provider=c.provider AND p.project_id=c.project_id
+               WHERE c.project_id IS NOT NULL
+               GROUP BY c.provider,c.project_id,p.name
+               ORDER BY c.provider,COALESCE(p.name,c.project_id)"""
+        ).fetchall()
+        result = []
+        for row in rows:
+            examples = db.execute(
+                "SELECT title FROM conversations WHERE provider=? AND project_id=? ORDER BY COALESCE(updated_epoch,created_epoch,0) DESC LIMIT 3",
+                (row["provider"], row["project_id"]),
+            ).fetchall()
+            result.append(dict(row) | {"examples": [item["title"] or "Untitled" for item in examples]})
+        return result
+    finally:
+        db.close()
+
+
+def save_project_name(database_path: Path, provider: str, project_id: str, name: str) -> None:
+    cleaned = name.strip()
+    if not cleaned:
+        raise ValueError("Project name cannot be empty")
+    db = connect(database_path)
+    try:
+        with db:
+            db.execute(
+                "INSERT INTO projects(provider,project_id,name) VALUES(?,?,?) "
+                "ON CONFLICT(provider,project_id) DO UPDATE SET name=excluded.name",
+                (provider, project_id, cleaned),
+            )
+    finally:
+        db.close()

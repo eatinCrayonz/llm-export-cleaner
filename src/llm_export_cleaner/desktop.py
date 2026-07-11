@@ -23,7 +23,7 @@ from llm_export_cleaner.exporter import export_cleaned
 from llm_export_cleaner.filters import DEFAULT_PROFILE
 from llm_export_cleaner.library import (
     default_database_path, get_conversation, import_export, import_history,
-    list_conversations, list_profiles, save_profile, search, stats,
+    list_conversations, list_profiles, list_projects, save_profile, save_project_name, search, stats,
 )
 
 
@@ -62,6 +62,7 @@ class CleanerApp:
         self.import_button = ttk.Button(add, text="Choose export...", command=self._choose_import)
         self.import_button.pack(side="left", padx=(8, 0))
         ttk.Button(add, text="Claude Project page...", command=self._claude_page).pack(side="left", padx=(8, 0))
+        ttk.Button(add, text="Project names...", command=self._project_names).pack(side="left", padx=(8, 0))
         ttk.Button(add, text="Import history", command=self._show_history).pack(side="left", padx=(8, 0))
         self.import_status = ttk.Label(add, text="")
         self.import_status.pack(side="left", padx=12)
@@ -273,6 +274,42 @@ class CleanerApp:
 
     def _show_history(self) -> None:
         self._background("history", lambda: import_history(self.database_path, 100))
+
+    def _project_names(self) -> None:
+        projects = list_projects(self.database_path)
+        window = tk.Toplevel(self.root)
+        window.title("Project names")
+        window.geometry("940x520")
+        frame = ttk.Frame(window, padding=14)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Select a Project, enter its name, and save. Example conversations help identify UUID-only Projects.", wraplength=880).pack(anchor="w", pady=(0, 10))
+        tree = ttk.Treeview(frame, columns=("provider", "name", "count", "id", "examples"), show="headings", height=14)
+        for column, label, width in (("provider", "Provider", 80), ("name", "Project name", 180), ("count", "Conversations", 90), ("id", "Project UUID", 260), ("examples", "Example conversations", 300)):
+            tree.heading(column, text=label); tree.column(column, width=width, minwidth=60)
+        tree.pack(fill="both", expand=True)
+        by_iid: dict[str, dict[str, Any]] = {}
+        for index, project in enumerate(projects):
+            iid = f"p{index}"; by_iid[iid] = project
+            tree.insert("", "end", iid=iid, values=(project["provider"], project["name"], project["conversation_count"], project["project_id"], " | ".join(project["examples"])))
+        controls = ttk.Frame(frame); controls.pack(fill="x", pady=(10, 0))
+        name = tk.StringVar()
+        ttk.Label(controls, text="Project name").pack(side="left")
+        entry = ttk.Entry(controls, textvariable=name, width=38); entry.pack(side="left", padx=8)
+        def selected(_event: Any = None) -> None:
+            choice = tree.selection()
+            if choice: name.set(by_iid[choice[0]]["name"])
+        tree.bind("<<TreeviewSelect>>", selected)
+        def save() -> None:
+            choice = tree.selection()
+            if not choice:
+                messagebox.showinfo("Project names", "Select a Project first."); return
+            project = by_iid[choice[0]]
+            try: save_project_name(self.database_path, project["provider"], project["project_id"], name.get())
+            except ValueError as error: messagebox.showerror("Project names", str(error)); return
+            project["name"] = name.get().strip(); tree.set(choice[0], "name", project["name"])
+            self._browse()
+        ttk.Button(controls, text="Save name", command=save).pack(side="left")
+        ttk.Button(controls, text="Close", command=window.destroy).pack(side="right")
 
     def _profile_changed(self) -> None:
         self._refresh_stats(); self._browse()
