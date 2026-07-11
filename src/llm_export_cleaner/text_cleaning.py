@@ -8,10 +8,6 @@ import unicodedata
 
 
 _MARKER = re.compile("\ue200(?P<kind>[a-z_]+)\ue202(?P<payload>.*?)\ue201", re.DOTALL)
-_EMOJI = re.compile(
-    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002300-\U000023FF]"
-    "[\uFE0E\uFE0F\U0001F3FB-\U0001F3FF]*"
-)
 _TOOL_KEYS = {
     "search_query", "image_query", "open", "click", "find", "screenshot",
     "finance", "weather", "sports", "time", "response_length",
@@ -72,7 +68,6 @@ def clean_text(value: str) -> str | None:
     if _is_tool_payload(text):
         return None
     text = _MARKER.sub(_replace_marker, text)
-    text = _EMOJI.sub("", text).replace("\u200d", "").replace("\ufe0f", "")
     lines = [re.sub(r"[ \t]{2,}", " ", line).rstrip() for line in text.splitlines()]
     text = "\n".join(lines)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()

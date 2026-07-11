@@ -137,7 +137,11 @@ names needed for local Project matching.
 
 ## Clean exports
 
-JSON and JSONL outputs contain only the documented canonical fields. Every
+Markdown, JSON, and JSONL outputs contain only the documented canonical fields.
+Markdown is the default for human or LLM reading: it omits merge-only IDs and
+constant branch flags while retaining conversation boundaries, provider, date,
+Project name, speaker roles, timestamps, and text. JSON/JSONL remain available
+for structured pipelines. Every
 output receives a companion `*-manifest.json` with source sizes, import count,
 profile, export mode, conversation/message counts, and output bytes.
 

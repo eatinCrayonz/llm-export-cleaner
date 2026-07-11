@@ -22,7 +22,7 @@ from llm_export_cleaner.text_cleaning import clean_text, remove_generated_code  
 class TextCleaningTests(unittest.TestCase):
     def test_repairs_mojibake_and_removes_chatgpt_artifacts_and_emoji(self) -> None:
         value = "It isnâ€™t official. îˆ€citeîˆ‚turn0search0îˆ **îˆ€entityîˆ‚[\"movie\",\"The Good\",\"film\"]îˆ** 🎬"
-        self.assertEqual(clean_text(value), "It isn’t official. **The Good**")
+        self.assertEqual(clean_text(value), "It isn’t official. **The Good** 🎬")
 
     def test_drops_internal_tool_payload(self) -> None:
         self.assertIsNone(clean_text('{"search_query":[{"q":"example"}],"response_length":"short"}'))
@@ -205,6 +205,20 @@ class LibraryTests(unittest.TestCase):
             records = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual(result["mode"], "selected")
         self.assertEqual([record["conversation_id"] for record in records], ["c2", "c1"])
+
+    def test_markdown_export_is_readable_and_omits_internal_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); db = root / "cleaner.sqlite3"; source = root / "one.json"
+            self._write_claude(source, extended=True)
+            import_export(provider="claude", input_path=source, database_path=db)
+            save_profile(db, {"name": "All", "exclude_single_exchange": False, "minimum_user_turns": 0})
+            output = root / "cleaned.md"
+            result = export_cleaned(database_path=db, output_path=output, profile_name="All")
+            markdown = output.read_text(encoding="utf-8")
+        self.assertEqual(result["format"], "md")
+        self.assertIn("--- CONVERSATION 1 ---", markdown)
+        self.assertIn("[USER", markdown)
+        self.assertNotIn("message_id", markdown)
 
 
 if __name__ == "__main__":

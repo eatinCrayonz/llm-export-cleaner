@@ -7,7 +7,7 @@ __pycache__/
 .pytest_cache/
 exports/
 data/
+*-manifest.json
 *.sqlite3
 *.db
 *.jsonl
-

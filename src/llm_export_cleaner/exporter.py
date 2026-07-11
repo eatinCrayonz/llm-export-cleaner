@@ -19,8 +19,8 @@ def export_cleaned(
     selected_keys: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     output = output_path.expanduser().resolve()
-    if output.suffix.lower() not in {".json", ".jsonl"}:
-        raise ValueError("Output must end in .json or .jsonl")
+    if output.suffix.lower() not in {".json", ".jsonl", ".md"}:
+        raise ValueError("Output must end in .json, .jsonl, or .md")
     output.parent.mkdir(parents=True, exist_ok=True)
     db = connect(database_path)
     clauses = ["p.name=?"]
@@ -37,7 +37,9 @@ def export_cleaned(
         profile = json.loads(profile_row["profile_json"])
         remove_code = bool(profile.get("remove_generated_code")) if remove_code is None else remove_code
         rows = db.execute(
-            f"""SELECT c.*,r.included,r.reasons_json FROM conversations c
+            f"""SELECT c.*,r.included,r.reasons_json,
+                (SELECT name FROM projects x WHERE x.provider=c.provider AND x.project_id=c.project_id) project_name
+                FROM conversations c
                 JOIN cleaning_profiles p ON p.name=?
                 JOIN filter_results r ON r.profile_id=p.profile_id AND r.provider=c.provider AND r.conversation_id=c.conversation_id
                 WHERE {' AND '.join(clauses[1:]) if len(clauses)>1 else '1=1'}
@@ -74,16 +76,34 @@ def export_cleaned(
                 "title": row["title"], "created_at": row["created_at"],
                 "updated_at": row["updated_at"], "project_id": row["project_id"],
                 "active_leaf_message_id": row["active_leaf_message_id"],
+                "_project_name": row["project_name"],
                 "messages": clean_messages,
             }
             records.append(record)
             message_total += len(clean_messages)
-        if output.suffix.lower() == ".jsonl":
+        if output.suffix.lower() == ".md":
+            with output.open("w", encoding="utf-8", newline="\n") as handle:
+                for index, record in enumerate(records, 1):
+                    handle.write(f"--- CONVERSATION {index} ---\n")
+                    handle.write(f"Title: {record['title'] or 'Untitled'}\n")
+                    handle.write(f"Provider: {record['provider']}\n")
+                    handle.write(f"Date: {record['created_at'] or ''}\n")
+                    if record.get("_project_name"):
+                        handle.write(f"Project: {record['_project_name']}\n")
+                    handle.write("\n")
+                    for message in record["messages"]:
+                        label = "USER" if message["role"] == "user" else "ASSISTANT"
+                        timestamp = f" | {message['created_at']}" if message.get("created_at") else ""
+                        handle.write(f"[{label}{timestamp}]\n{message['text']}\n\n")
+                    handle.write("--- END CONVERSATION ---\n\n")
+        elif output.suffix.lower() == ".jsonl":
             with output.open("w", encoding="utf-8", newline="\n") as handle:
                 for record in records:
-                    handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+                    portable = {key: value for key, value in record.items() if not key.startswith("_")}
+                    handle.write(json.dumps(portable, ensure_ascii=False, sort_keys=True) + "\n")
         else:
-            output.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+            portable = [{key: value for key, value in record.items() if not key.startswith("_")} for record in records]
+            output.write_text(json.dumps(portable, ensure_ascii=False, indent=2), encoding="utf-8")
         reason_rows = db.execute(
             """SELECT r.reasons_json FROM filter_results r
                JOIN cleaning_profiles p ON p.profile_id=r.profile_id
@@ -105,6 +125,7 @@ def export_cleaned(
         "conversations_available": total, "conversations_exported": len(records),
         "messages_exported": message_total,
         "generated_code_removed": bool(remove_code),
+        "format": output.suffix.lower().lstrip("."),
         "excluded_by_reason": dict(sorted(excluded_reasons.items())),
         "output": str(output), "output_bytes": output.stat().st_size,
     }

@@ -17,7 +17,7 @@ from llm_export_cleaner.timestamps import date_boundary, timestamp_epoch
 from llm_export_cleaner.text_cleaning import clean_text, remove_generated_code
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 SCHEMA = """
 PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
@@ -91,6 +91,10 @@ def connect(path: Path) -> sqlite3.Connection:
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if current and int(current["value"]) == 3:
         _migrate_clean_text(db)
+        db.execute("UPDATE meta SET value='4' WHERE key='schema_version'")
+        current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    if current and int(current["value"]) == 4:
+        _repair_record_hashes(db)
         db.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
         current = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
     if not current or int(current["value"]) != SCHEMA_VERSION:
@@ -126,6 +130,46 @@ def _migrate_clean_text(db: sqlite3.Connection) -> None:
         db.execute(
             "INSERT INTO conversation_fts(provider,conversation_id,title,text) VALUES(?,?,?,?)",
             (conversation["provider"], conversation["conversation_id"], conversation["title"] or "", "\n\n".join(message["text"] for message in messages)),
+        )
+
+
+def _repair_record_hashes(db: sqlite3.Connection) -> None:
+    conversations = db.execute("SELECT * FROM conversations").fetchall()
+    for conversation in conversations:
+        messages = db.execute(
+            "SELECT * FROM messages WHERE provider=? AND conversation_id=? ORDER BY COALESCE(created_epoch,0),rowid",
+            (conversation["provider"], conversation["conversation_id"]),
+        ).fetchall()
+        message_hashes = []
+        for message in messages:
+            canonical = {
+                "provider": message["provider"], "conversation_id": message["conversation_id"],
+                "message_id": message["message_id"], "parent_message_id": message["parent_message_id"],
+                "role": message["role"], "text": message["text"], "created_at": message["created_at"],
+                "is_active_path": bool(message["is_active_path"]), "is_alternative": bool(message["is_alternative"]),
+                "attachment_count": int(message["attachment_count"]),
+            }
+            message_hash = stable_hash(canonical)
+            message_hashes.append(message_hash)
+            db.execute(
+                "UPDATE messages SET record_hash=? WHERE provider=? AND conversation_id=? AND message_id=?",
+                (message_hash, message["provider"], message["conversation_id"], message["message_id"]),
+            )
+        metrics = {
+            "message_count": len(messages), "active_message_count": len(messages),
+            "active_user_turn_count": sum(message["role"] == "user" for message in messages),
+            "alternative_message_count": 0,
+        }
+        canonical_conversation = {
+            "provider": conversation["provider"], "conversation_id": conversation["conversation_id"],
+            "title": conversation["title"], "created_at": conversation["created_at"],
+            "updated_at": conversation["updated_at"], "project_id": conversation["project_id"],
+            "active_leaf_message_id": conversation["active_leaf_message_id"], **metrics,
+            "message_hashes": message_hashes,
+        }
+        db.execute(
+            "UPDATE conversations SET record_hash=? WHERE provider=? AND conversation_id=?",
+            (stable_hash(canonical_conversation), conversation["provider"], conversation["conversation_id"]),
         )
 
 

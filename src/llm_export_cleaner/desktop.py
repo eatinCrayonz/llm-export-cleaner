@@ -248,7 +248,7 @@ class CleanerApp:
         ttk.Button(frame, text="Cancel", command=window.destroy).grid(row=9, column=1, pady=18, sticky="e")
 
     def _export(self, delta: bool = False) -> None:
-        output = filedialog.asksaveasfilename(title="Save cleaned corpus", defaultextension=".jsonl", filetypes=(("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
+        output = filedialog.asksaveasfilename(title="Save cleaned corpus", defaultextension=".md", filetypes=(("Markdown transcript", "*.md"), ("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
         if not output:
             return
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}
@@ -273,7 +273,7 @@ class CleanerApp:
         if not keys:
             messagebox.showinfo("Export selected", "Select one or more conversations first.")
             return
-        output = filedialog.asksaveasfilename(title="Save selected conversations", defaultextension=".jsonl", filetypes=(("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
+        output = filedialog.asksaveasfilename(title="Save selected conversations", defaultextension=".md", filetypes=(("Markdown transcript", "*.md"), ("JSON Lines", "*.jsonl"), ("JSON", "*.json")))
         if not output:
             return
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}
