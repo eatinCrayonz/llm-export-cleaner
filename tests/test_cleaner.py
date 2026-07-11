@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from llm_export_cleaner.claude_projects import apply_page, parse_page  # noqa: E402
+from llm_export_cleaner.chatgpt_projects import apply_catalog, parse_catalog  # noqa: E402
 from llm_export_cleaner.exporter import export_cleaned  # noqa: E402
 from llm_export_cleaner.library import (  # noqa: E402
     get_conversation, import_export, import_history, list_conversations,
@@ -25,6 +26,25 @@ class TextCleaningTests(unittest.TestCase):
 
     def test_drops_internal_tool_payload(self) -> None:
         self.assertIsNone(clean_text('{"search_query":[{"q":"example"}],"response_length":"short"}'))
+
+
+class ChatGPTProjectTests(unittest.TestCase):
+    def test_nested_sidebar_catalog_maps_project_name(self) -> None:
+        catalog = json.dumps({"items": [{"gizmo": {"gizmo": {"id": "g-p-one", "display": {"name": "Research"}, "author": {"user_email": "discard@example.com"}}}}], "cursor": None})
+        parsed = parse_catalog(catalog)
+        with tempfile.TemporaryDirectory() as temporary:
+            db = Path(temporary) / "cleaner.sqlite3"
+            from llm_export_cleaner.library import connect
+            connection = connect(db)
+            with connection:
+                connection.execute("INSERT INTO conversations(provider,conversation_id,title,created_at,created_epoch,updated_at,updated_epoch,project_id,active_leaf_message_id,message_count,active_message_count,active_user_turn_count,alternative_message_count,record_hash,first_import_id,last_import_id,last_changed_import_id) VALUES('chatgpt','c1','Test',NULL,NULL,NULL,NULL,'g-p-one',NULL,0,0,0,0,'hash',1,1,1)")
+            connection.close()
+            result = apply_catalog(database_path=db, catalog_text=catalog)
+            projects = list_projects(db)
+        self.assertEqual(parsed["project_names"], {"g-p-one": "Research"})
+        self.assertEqual(result["matched"], 1)
+        self.assertEqual(result["still_unnamed"], 0)
+        self.assertEqual(projects[0]["name"], "Research")
 
 
 class NormalizerTests(unittest.TestCase):

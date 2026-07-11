@@ -106,10 +106,27 @@ conversations_v2  Conversation UUID -> Project UUID
 ### ChatGPT Projects
 
 ChatGPT exports commonly provide Project membership as `gizmo_id` values such
-as `g-p-...`, but not Project names. The signed-in ChatGPT Project/sidebar
-catalog supplies the missing `gizmo.id` to `gizmo.display.name` lookup. Until a
-catalog response is imported, use **Project names...** to identify UUIDs from
-example conversations and assign their names manually.
+as `g-p-...`, but not Project names. With the ChatGPT sidebar visible, use the
+same Network workflow and filter for this request:
+
+```text
+GET /backend-api/gizmos/snorlax/sidebar
+```
+
+Copy its response JSON and paste it into **ChatGPT Projects...**. The observed
+response nests the lookup at:
+
+```text
+items[].gizmo.gizmo.id
+items[].gizmo.gizmo.display.name
+```
+
+Some versions may omit one `gizmo` wrapper; the importer accepts both shapes.
+If the response has a non-null `cursor`, capture and import subsequent cursor
+pages. The app reports how many Project IDs matched the imported ChatGPT export
+and how many remain unnamed. For an individual missing Project, the fallback
+request is `/backend-api/gizmos/{gizmo_id}`; its ID and display name can also be
+entered through **Project names...**.
 
 These copied responses can contain account identifiers and other private
 metadata. Do not publish them. The cleaner extracts only the identifiers and

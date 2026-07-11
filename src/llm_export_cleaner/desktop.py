@@ -19,6 +19,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from llm_export_cleaner.claude_projects import apply_page
+from llm_export_cleaner.chatgpt_projects import apply_catalog
 from llm_export_cleaner.exporter import export_cleaned
 from llm_export_cleaner.filters import DEFAULT_PROFILE
 from llm_export_cleaner.library import (
@@ -63,6 +64,7 @@ class CleanerApp:
         self.import_button = ttk.Button(add, text="Choose export...", command=self._choose_import)
         self.import_button.pack(side="left", padx=(8, 0))
         ttk.Button(add, text="Claude Project page...", command=self._claude_page).pack(side="left", padx=(8, 0))
+        ttk.Button(add, text="ChatGPT Projects...", command=self._chatgpt_projects).pack(side="left", padx=(8, 0))
         ttk.Button(add, text="Project names...", command=self._project_names).pack(side="left", padx=(8, 0))
         ttk.Button(add, text="Import history", command=self._show_history).pack(side="left", padx=(8, 0))
         self.import_status = ttk.Label(add, text="")
@@ -273,6 +275,29 @@ class CleanerApp:
         ttk.Button(buttons, text="Import page", command=apply).pack(side="left", padx=8)
         ttk.Button(buttons, text="Close", command=window.destroy).pack(side="right")
 
+    def _chatgpt_projects(self) -> None:
+        window = tk.Toplevel(self.root)
+        window.title("Import ChatGPT Project catalog")
+        window.geometry("760x600")
+        frame = ttk.Frame(window, padding=14)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Paste the JSON response from /backend-api/gizmos/snorlax/sidebar. Only Project IDs and display names are retained.", wraplength=700).pack(anchor="w", pady=(0, 10))
+        text = scrolledtext.ScrolledText(frame, wrap="none")
+        text.pack(fill="both", expand=True)
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(10, 0))
+        def paste() -> None:
+            try: value = self.root.clipboard_get()
+            except tk.TclError: value = ""
+            text.delete("1.0", "end"); text.insert("1.0", value)
+        def apply() -> None:
+            value = text.get("1.0", "end").strip()
+            if not value: return
+            window.destroy(); self._background("chatgpt-projects", lambda: apply_catalog(database_path=self.database_path, catalog_text=value))
+        ttk.Button(buttons, text="Paste from clipboard", command=paste).pack(side="left")
+        ttk.Button(buttons, text="Import catalog", command=apply).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Close", command=window.destroy).pack(side="right")
+
     def _show_history(self) -> None:
         self._background("history", lambda: import_history(self.database_path, 100))
 
@@ -356,6 +381,10 @@ class CleanerApp:
                         status = f"Claude Projects: {payload['updated']} updated, {payload['unknown']} unknown{more}"
                     self.import_status.configure(text=status)
                     self._refresh_stats(); self._browse()
+                elif kind == "chatgpt-projects":
+                    more = "; additional cursor page exists" if payload["has_more"] else ""
+                    self.import_status.configure(text=f"ChatGPT Projects: {payload['matched']} matched, {payload['still_unnamed']} still unnamed{more}")
+                    self._browse()
                 elif kind == "history":
                     rows = [{"provider": r["provider"], "title": r["source_file"], "updated_at": r["imported_at_utc"], "active_user_turn_count": "import", "project_id": None, "included": 1, "conversation_id": "", "snippet": f"{r['new_conversations']} new; {r['changed_conversations']} changed; {r['unchanged_conversations']} unchanged"} for r in payload]
                     self._show_rows(rows)
