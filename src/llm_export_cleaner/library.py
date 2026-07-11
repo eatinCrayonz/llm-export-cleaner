@@ -14,7 +14,7 @@ from typing import Any, Callable
 from llm_export_cleaner.filters import DEFAULT_PROFILE, evaluate_conversation
 from llm_export_cleaner.normalizers import Audit, NORMALIZERS
 from llm_export_cleaner.timestamps import date_boundary, timestamp_epoch
-from llm_export_cleaner.text_cleaning import clean_text
+from llm_export_cleaner.text_cleaning import clean_text, remove_generated_code
 
 
 SCHEMA_VERSION = 4
@@ -423,7 +423,7 @@ def search(
         db.close()
 
 
-def get_conversation(database_path: Path, provider: str, conversation_id: str) -> dict[str, Any]:
+def get_conversation(database_path: Path, provider: str, conversation_id: str, *, without_generated_code: bool = False) -> dict[str, Any]:
     db = connect(database_path)
     try:
         conversation = db.execute("SELECT * FROM conversations WHERE provider=? AND conversation_id=?", (provider, conversation_id)).fetchone()
@@ -431,7 +431,12 @@ def get_conversation(database_path: Path, provider: str, conversation_id: str) -
             raise KeyError("Conversation not found")
         clause = " AND is_active_path=1"
         messages = db.execute(f"SELECT * FROM messages WHERE provider=? AND conversation_id=?{clause} ORDER BY COALESCE(created_epoch,0),rowid", (provider, conversation_id)).fetchall()
-        return dict(conversation) | {"messages": [dict(row) for row in messages]}
+        result = [dict(row) for row in messages]
+        if without_generated_code:
+            for message in result:
+                if message["role"] == "assistant":
+                    message["text"] = remove_generated_code(message["text"])
+        return dict(conversation) | {"messages": result}
     finally:
         db.close()
 
@@ -498,4 +503,3 @@ def list_projects(database_path: Path) -> list[dict[str, Any]]:
         return result
     finally:
         db.close()
-

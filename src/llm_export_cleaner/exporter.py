@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from llm_export_cleaner.library import connect, utc_now
+from llm_export_cleaner.text_cleaning import remove_generated_code
 
 
 def export_cleaned(
     *, database_path: Path, output_path: Path, profile_name: str = "Default",
     included_only: bool = True, import_id: int | None = None,
     include_attachment_counts: bool = False,
+    remove_code: bool | None = None,
 ) -> dict[str, Any]:
     output = output_path.expanduser().resolve()
     if output.suffix.lower() not in {".json", ".jsonl"}:
@@ -28,6 +30,11 @@ def export_cleaned(
         clauses.append("c.last_changed_import_id>=?")
         params.append(import_id)
     try:
+        profile_row = db.execute("SELECT profile_json FROM cleaning_profiles WHERE name=?", (profile_name,)).fetchone()
+        if profile_row is None:
+            raise ValueError(f"Unknown cleaning profile: {profile_name}")
+        profile = json.loads(profile_row["profile_json"])
+        remove_code = bool(profile.get("remove_generated_code")) if remove_code is None else remove_code
         rows = db.execute(
             f"""SELECT c.*,r.included,r.reasons_json FROM conversations c
                 JOIN cleaning_profiles p ON p.name=?
@@ -49,7 +56,8 @@ def export_cleaned(
                 item = {
                     "message_id": message["message_id"],
                     "parent_message_id": message["parent_message_id"],
-                    "role": message["role"], "text": message["text"],
+                    "role": message["role"],
+                    "text": remove_generated_code(message["text"]) if remove_code and message["role"] == "assistant" else message["text"],
                     "created_at": message["created_at"],
                     "is_active_path": bool(message["is_active_path"]),
                     "is_alternative": bool(message["is_alternative"]),
@@ -92,6 +100,7 @@ def export_cleaned(
         "source_imports": int(import_stats["count"]), "source_bytes_seen": int(import_stats["bytes"]),
         "conversations_available": total, "conversations_exported": len(records),
         "messages_exported": message_total,
+        "generated_code_removed": bool(remove_code),
         "excluded_by_reason": dict(sorted(excluded_reasons.items())),
         "output": str(output), "output_bytes": output.stat().st_size,
     }

@@ -16,6 +16,10 @@ _TOOL_KEYS = {
     "search_query", "image_query", "open", "click", "find", "screenshot",
     "finance", "weather", "sports", "time", "response_length",
 }
+_FENCED_CODE = re.compile(
+    r"^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*\n.*?^[ \t]*(?P=fence)[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def _repair_mojibake(text: str) -> str:
@@ -73,3 +77,14 @@ def clean_text(value: str) -> str | None:
     text = "\n".join(lines)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text or None
+
+
+def remove_generated_code(text: str) -> str:
+    """Remove explicit fenced blocks while retaining the assistant turn."""
+    cleaned = _FENCED_CODE.sub("[Generated code removed]", text)
+    cleaned = re.sub(
+        r"(?:\[Generated code removed\][ \t]*\n*){2,}",
+        "[Generated code removed]\n",
+        cleaned,
+    )
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()

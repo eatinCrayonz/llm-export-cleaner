@@ -15,6 +15,7 @@ DEFAULT_PROFILE = {
     "after": None,
     "before": None,
     "include_attachment_counts": False,
+    "remove_generated_code": False,
 }
 
 

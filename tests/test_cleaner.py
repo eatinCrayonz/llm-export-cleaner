@@ -16,7 +16,7 @@ from llm_export_cleaner.library import (  # noqa: E402
     list_projects, save_profile, search, stats,
 )
 from llm_export_cleaner.normalizers import Audit, normalize_chatgpt, normalize_claude, normalize_grok  # noqa: E402
-from llm_export_cleaner.text_cleaning import clean_text  # noqa: E402
+from llm_export_cleaner.text_cleaning import clean_text, remove_generated_code  # noqa: E402
 
 
 class TextCleaningTests(unittest.TestCase):
@@ -26,6 +26,10 @@ class TextCleaningTests(unittest.TestCase):
 
     def test_drops_internal_tool_payload(self) -> None:
         self.assertIsNone(clean_text('{"search_query":[{"q":"example"}],"response_length":"short"}'))
+
+    def test_removes_fenced_code_but_preserves_prose_and_inline_code(self) -> None:
+        value = "Use `run()` first.\n\n```python\nprint('large block')\n```\n\nThen verify it."
+        self.assertEqual(remove_generated_code(value), "Use `run()` first.\n\n[Generated code removed]\n\nThen verify it.")
 
 
 class ChatGPTProjectTests(unittest.TestCase):

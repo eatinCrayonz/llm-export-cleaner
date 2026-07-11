@@ -194,7 +194,9 @@ class CleanerApp:
         if not selected or "conversation_id" not in self.rows[selected[0]]:
             return
         row = self.rows[selected[0]]
-        conversation = get_conversation(self.database_path, row["provider"], row["conversation_id"])
+        profiles = {p["name"]: p for p in list_profiles(self.database_path)}
+        remove_code = bool(profiles.get(self.profile_name.get(), {}).get("remove_generated_code"))
+        conversation = get_conversation(self.database_path, row["provider"], row["conversation_id"], without_generated_code=remove_code)
         window = tk.Toplevel(self.root)
         window.title(conversation.get("title") or "Untitled")
         window.geometry("900x700")
@@ -218,15 +220,16 @@ class CleanerApp:
         project_only = tk.BooleanVar(value=bool(current["project_only"]))
         keep_projects = tk.BooleanVar(value=bool(current["keep_short_projects"]))
         attachments = tk.BooleanVar(value=bool(current["include_attachment_counts"]))
+        remove_code = tk.BooleanVar(value=bool(current["remove_generated_code"]))
         ttk.Label(frame, text="Profile name").grid(row=0, column=0, sticky="w")
         ttk.Entry(frame, textvariable=name, width=30).grid(row=0, column=1, sticky="w")
         ttk.Label(frame, text="Minimum user turns").grid(row=1, column=0, sticky="w", pady=8)
         ttk.Spinbox(frame, from_=0, to=1000, textvariable=min_turns, width=8).grid(row=1, column=1, sticky="w")
-        options = [("Exclude single-question/single-answer conversations", single), ("Project conversations only", project_only), ("Keep short Project conversations", keep_projects), ("Include attachment counts in exports", attachments)]
+        options = [("Exclude single-question/single-answer conversations", single), ("Project conversations only", project_only), ("Keep short Project conversations", keep_projects), ("Remove generated code blocks from views and exports", remove_code), ("Include attachment counts in exports", attachments)]
         for row_index, (label, variable) in enumerate(options, 2):
             ttk.Checkbutton(frame, text=label, variable=variable).grid(row=row_index, column=0, columnspan=2, sticky="w", pady=5)
         def save() -> None:
-            profile = {**current, "name": name.get(), "minimum_user_turns": min_turns.get(), "exclude_single_exchange": single.get(), "project_only": project_only.get(), "keep_short_projects": keep_projects.get(), "include_attachment_counts": attachments.get()}
+            profile = {**current, "name": name.get(), "minimum_user_turns": min_turns.get(), "exclude_single_exchange": single.get(), "project_only": project_only.get(), "keep_short_projects": keep_projects.get(), "remove_generated_code": remove_code.get(), "include_attachment_counts": attachments.get()}
             save_profile(self.database_path, profile)
             self.profile_name.set(profile["name"])
             window.destroy()
@@ -248,6 +251,7 @@ class CleanerApp:
         self._background("export", lambda: export_cleaned(
             database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name.get(),
             included_only=True, import_id=import_id,
+            remove_code=bool(profile.get("remove_generated_code")),
             include_attachment_counts=bool(profile.get("include_attachment_counts")),
         ))
 
