@@ -22,13 +22,16 @@ from llm_export_cleaner.ui.theme import COLORS, SIZE_SMALL, apply_theme, font
 from llm_export_cleaner.ui.widgets import KeyValueGrid, Panel, StatusBar, ToggleRow
 
 
-RULE_LABELS = {
+KEEP_RULES = {
     "exclude_single_exchange": "drop single-exchange",
     "keep_short_projects": "keep short projects",
     "project_only": "projects only",
+}
+EXPORT_OPTIONS = {
     "remove_generated_code": "strip generated code",
     "include_attachment_counts": "attachment counts",
 }
+RULE_LABELS = {**KEEP_RULES, **EXPORT_OPTIONS}
 TEXT_WIDGETS = ("Entry", "TEntry", "TCombobox", "TSpinbox", "Spinbox", "Text")
 
 
@@ -135,17 +138,21 @@ class CleanerApp:
         self.profile_combo = ttk.Combobox(body, textvariable=self.profile_name, state="readonly", width=20)
         self.profile_combo.pack(anchor="w")
         self.profile_combo.bind("<<ComboboxSelected>>", lambda _e: self._profile_changed())
-        tk.Label(body, text="— rules", background=COLORS["bg"], foreground=COLORS["faint"],
-                 font=font(SIZE_SMALL)).pack(anchor="w", pady=(10, 2))
         self.profile_vars: dict[str, tk.BooleanVar] = {}
         self.profile_toggles: dict[str, ToggleRow] = {}
-        for key, label in RULE_LABELS.items():
-            variable = tk.BooleanVar(self.root, value=bool(DEFAULT_PROFILE[key]))
-            toggle = ToggleRow(body, text=label, variable=variable,
-                               command=lambda selected=key: self._toggle_rule(selected))
-            toggle.pack(fill="x")
-            self.profile_vars[key] = variable
-            self.profile_toggles[key] = toggle
+
+        def add_toggles(heading: str, labels: dict[str, str]) -> None:
+            tk.Label(body, text=heading, background=COLORS["bg"], foreground=COLORS["faint"],
+                     font=font(SIZE_SMALL)).pack(anchor="w", pady=(10, 2))
+            for key, label in labels.items():
+                variable = tk.BooleanVar(self.root, value=bool(DEFAULT_PROFILE[key]))
+                toggle = ToggleRow(body, text=label, variable=variable,
+                                   command=lambda selected=key: self._toggle_rule(selected))
+                toggle.pack(fill="x")
+                self.profile_vars[key] = variable
+                self.profile_toggles[key] = toggle
+
+        add_toggles("— keep rules (filter the list)", KEEP_RULES)
         turns = tk.Frame(body, background=COLORS["bg"])
         turns.pack(fill="x", pady=(6, 0))
         tk.Label(turns, text="min user turns", background=COLORS["bg"], foreground=COLORS["dim"],
@@ -156,6 +163,7 @@ class CleanerApp:
         spin.pack(side="left", padx=(8, 0))
         spin.bind("<Return>", lambda _e: self._save_min_turns())
         spin.bind("<FocusOut>", lambda _e: self._save_min_turns())
+        add_toggles("— export options (not the list)", EXPORT_OPTIONS)
         tk.Label(body, text="— export", background=COLORS["bg"], foreground=COLORS["faint"],
                  font=font(SIZE_SMALL)).pack(anchor="w", pady=(12, 2))
         ttk.Button(body, text="export corpus…", command=self._export).pack(fill="x")
@@ -294,8 +302,10 @@ class CleanerApp:
         profile = self._current_profile()
         profile[key] = self.profile_vars[key].get()
         save_profile(self.database_path, profile)
+        note = " · applies to exports and transcript view" if key in EXPORT_OPTIONS else ""
+        self.status_bar.set_right(f"profile saved{note}")
         self._refresh_stats()
-        self._browse()
+        self._search()
 
     def _save_min_turns(self) -> None:
         try:
@@ -307,8 +317,9 @@ class CleanerApp:
             return
         profile["minimum_user_turns"] = value
         save_profile(self.database_path, profile)
+        self.status_bar.set_right("profile saved")
         self._refresh_stats()
-        self._browse()
+        self._search()
 
     def _load_profile_controls(self) -> None:
         profile = self._current_profile()
