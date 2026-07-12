@@ -22,12 +22,13 @@ live and take effect immediately.
 1. Select the provider and import its JSON export (panel 2).
 2. Toggle cleaning rules or switch profiles (panel 4).
 3. Search or browse retained conversations; excluded rows appear dimmed
-   with their filter reason when **filtered** is on.
+   with their filter reason when **show excluded** is on.
 4. Export the complete cleaned corpus, only the latest import's changes,
    or just the selected rows.
 
 Keyboard: `i` import · `e` export · `/` search · `p` profile · `x` show
-filtered · `h` history. The conversation table supports extended
+excluded · `h` history. Changing the provider dropdown re-runs the
+current search or browse immediately. The conversation table supports extended
 selection: `Ctrl+click` toggles rows, `Shift+click` selects ranges, and
 `Ctrl+A` selects every currently displayed row. **export selected…**
 writes only those conversations, in their visible table order, using
@@ -48,7 +49,7 @@ an older conversation.
 ## Search
 
 SQLite FTS5 indexes titles plus user and assistant text. Search defaults to the
-selected profile's included corpus; **Include filtered-out** reveals excluded
+selected profile's included corpus; **show excluded** reveals excluded
 conversations and their reasons.
 
 ## Recovering Project names and membership

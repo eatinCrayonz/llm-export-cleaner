@@ -74,11 +74,6 @@ class FilterMappingTests(unittest.TestCase):
         self.assertIsNone(presenters.provider_filter("All providers"))
         self.assertEqual(presenters.provider_filter("claude"), "claude")
 
-    def test_project_filter(self) -> None:
-        self.assertIsNone(presenters.project_filter("All conversations"))
-        self.assertIs(presenters.project_filter("In a Project"), True)
-        self.assertIs(presenters.project_filter("Not in a Project"), False)
-
 
 class SelectionTests(unittest.TestCase):
     def test_selected_keys_preserve_visible_order_and_skip_non_conversations(self) -> None:

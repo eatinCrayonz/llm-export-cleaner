@@ -102,13 +102,11 @@ class CleanerApp:
                                      state="readonly", width=12)
         self.provider.set("All providers")
         self.provider.pack(side="left", padx=(10, 0))
-        self.project = ttk.Combobox(inner, values=("All conversations", "In a Project", "Not in a Project"),
-                                    state="readonly", width=16)
-        self.project.set("All conversations")
-        self.project.pack(side="left", padx=(8, 0))
+        self.provider.bind("<<ComboboxSelected>>", lambda _e: self._search())
         self.include_filtered = tk.BooleanVar(value=False)
-        ToggleRow(inner, text="filtered", variable=self.include_filtered,
-                  command=self._browse).pack(side="left", padx=(10, 0))
+        self.filtered_toggle = ToggleRow(inner, text="show excluded", variable=self.include_filtered,
+                                         command=self._search)
+        self.filtered_toggle.pack(side="left", padx=(10, 0))
         ttk.Button(inner, text="search", command=self._search).pack(side="left", padx=(10, 0))
         ttk.Button(inner, text="browse", command=self._browse).pack(side="left", padx=(6, 0))
 
@@ -171,7 +169,7 @@ class CleanerApp:
         }
         self.status_bar = StatusBar(self.root, keys=(
             ("i", "import"), ("e", "export"), ("/", "search"),
-            ("p", "profile"), ("x", "filtered"), ("h", "history"),
+            ("p", "profile"), ("x", "excluded"), ("h", "history"),
         ))
         self.status_bar.pack(fill="x", side="bottom")
         self.root.bind("<Key>", self._hotkey)
@@ -182,9 +180,6 @@ class CleanerApp:
     # ------------------------------------------------------------ helpers
     def _optional_provider(self) -> str | None:
         return presenters.provider_filter(self.provider.get())
-
-    def _project_filter(self) -> bool | None:
-        return presenters.project_filter(self.project.get())
 
     def _current_profile(self) -> dict[str, Any]:
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}
@@ -210,7 +205,7 @@ class CleanerApp:
 
     def _toggle_filtered(self) -> None:
         self.include_filtered.set(not self.include_filtered.get())
-        self._browse()
+        self._search()
 
     def _escape_search(self) -> None:
         self.tree.focus_set()
@@ -236,14 +231,12 @@ class CleanerApp:
         self._background("rows", lambda: search(
             database_path=self.database_path, query=self.query.get(), profile_name=self.profile_name.get(),
             include_filtered=self.include_filtered.get(), provider=self._optional_provider(),
-            in_project=self._project_filter(),
         ))
 
     def _browse(self) -> None:
         self._background("rows", lambda: list_conversations(
             database_path=self.database_path, profile_name=self.profile_name.get(),
             include_filtered=self.include_filtered.get(), provider=self._optional_provider(),
-            in_project=self._project_filter(),
         ))
 
     def _sort_by(self, column: str) -> None:

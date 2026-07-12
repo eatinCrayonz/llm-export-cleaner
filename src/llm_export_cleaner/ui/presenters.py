@@ -66,10 +66,6 @@ def provider_filter(display: str) -> str | None:
     return None if display == "All providers" else display
 
 
-def project_filter(display: str) -> bool | None:
-    return True if display == "In a Project" else False if display == "Not in a Project" else None
-
-
 def selected_keys(
     ordered_iids: Iterable[str], rows: dict[str, dict[str, Any]], selected: set[str],
 ) -> list[tuple[str, str]]:

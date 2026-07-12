@@ -73,6 +73,15 @@ class AppLayoutTests(unittest.TestCase):
         app._handle_event("export", {"conversations_exported": 12, "output_bytes": 3400})
         self.assertEqual(app.status_bar.right.cget("text"), "Exported 12 conversations (3,400 bytes)")
 
+    def test_provider_change_refreshes_and_project_dropdown_is_gone(self) -> None:
+        app = self._app()
+        self.assertFalse(hasattr(app, "project"))
+        self.assertIn("<<ComboboxSelected>>", app.provider.bind())
+
+    def test_excluded_toggle_is_labeled_clearly(self) -> None:
+        app = self._app()
+        self.assertEqual(app.filtered_toggle.label.cget("text"), "[ ] show excluded")
+
     def test_desktop_module_still_exposes_cleaner_app(self) -> None:
         from llm_export_cleaner import desktop
         from llm_export_cleaner.ui.app import CleanerApp
