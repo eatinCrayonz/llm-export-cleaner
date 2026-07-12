@@ -59,14 +59,20 @@ class AppLayoutTests(unittest.TestCase):
         self.assertEqual(app.library_grid.value("kept / filtered"), "1,189 / 58")
         self.assertIn("(1,189/1,247)", app.conversations_panel.title_label.cget("text"))
 
-    def test_profile_toggle_persists_to_database(self) -> None:
+    def test_rule_toggle_persists_to_database(self) -> None:
         from llm_export_cleaner.library import list_profiles
         app = self._app()
-        toggle = app.profile_toggles["exclude_single_exchange"]
-        self.assertTrue(toggle._variable.get())
+        toggle = app.profile_toggles["project_only"]
+        self.assertFalse(toggle._variable.get())
         toggle.invoke()
         profiles = {p["name"]: p for p in list_profiles(self.database)}
-        self.assertFalse(profiles["Default"]["exclude_single_exchange"])
+        self.assertTrue(profiles["Default"]["project_only"])
+
+    def test_profile_management_is_gone(self) -> None:
+        app = self._app()
+        self.assertFalse(hasattr(app, "profile_combo"))
+        self.assertNotIn("exclude_single_exchange", app.profile_toggles)
+        self.assertNotIn("p", app.hotkeys)
 
     def test_export_event_lands_in_status_bar(self) -> None:
         app = self._app()

@@ -65,22 +65,21 @@ class RuleToggleTests(unittest.TestCase):
     def test_toggling_reports_saved_in_status_bar(self) -> None:
         self.app.profile_toggles["remove_generated_code"].invoke()
         self.assertEqual(self.app.status_bar.right.cget("text"),
-                         "profile saved · applies to exports and transcript view")
-        self.app.profile_toggles["exclude_single_exchange"].invoke()
-        self.assertEqual(self.app.status_bar.right.cget("text"), "profile saved")
+                         "rules saved · applies to exports and transcript view")
+        self.app.profile_toggles["project_only"].invoke()
+        self.assertEqual(self.app.status_bar.right.cget("text"), "rules saved")
+        self.app.profile_toggles["project_only"].invoke()
 
     def test_filter_rules_change_included_counts(self) -> None:
-        # Default: single-exchange dropped, short project kept -> long + proj included.
+        # Default: min 2 user turns, short project kept -> long + proj included.
         self.assertEqual(stats(self.database)["included"], 2)
-        self.app.profile_toggles["exclude_single_exchange"].invoke()  # allow singles
         self.app.min_turns.set(0)
-        self.app._save_min_turns()
+        self.app._save_min_turns()  # min turns now governs single exchanges too
         self.assertEqual(stats(self.database)["included"], 3)
         self.app.profile_toggles["project_only"].invoke()  # projects only
         self.assertEqual(stats(self.database)["included"], 1)
         self.app.profile_toggles["project_only"].invoke()
         self.app.profile_toggles["keep_short_projects"].invoke()  # drop short project grace
-        self.app.profile_toggles["exclude_single_exchange"].invoke()
         self.app.min_turns.set(2)
         self.app._save_min_turns()
         self.assertEqual(stats(self.database)["included"], 1)

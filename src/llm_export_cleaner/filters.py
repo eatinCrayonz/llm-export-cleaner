@@ -7,7 +7,6 @@ from typing import Any
 
 DEFAULT_PROFILE = {
     "name": "Default",
-    "exclude_single_exchange": True,
     "minimum_user_turns": 2,
     "project_only": False,
     "keep_short_projects": True,
@@ -27,8 +26,6 @@ def evaluate_conversation(record: dict[str, Any], profile: dict[str, Any]) -> tu
     if profile.get("project_only") and not project_id:
         reasons.append("not_in_project")
     if not short_project_exception:
-        if profile.get("exclude_single_exchange") and user_turns == 1:
-            reasons.append("single_exchange")
         minimum = int(profile.get("minimum_user_turns") or 0)
         if user_turns < minimum:
             reasons.append("below_minimum_user_turns")

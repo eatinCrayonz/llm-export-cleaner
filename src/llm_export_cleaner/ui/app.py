@@ -23,7 +23,6 @@ from llm_export_cleaner.ui.widgets import KeyValueGrid, Panel, StatusBar, Toggle
 
 
 KEEP_RULES = {
-    "exclude_single_exchange": "drop single-exchange",
     "keep_short_projects": "keep short projects",
     "project_only": "projects only",
 }
@@ -43,13 +42,13 @@ class CleanerApp:
         self.rows: dict[str, dict[str, Any]] = {}
         self.sort_column: str | None = None
         self.sort_descending = False
-        self.profile_name = tk.StringVar(value="Default")
+        self.profile_name = "Default"
         apply_theme(root)
         root.title("llm-export-cleaner")
         root.geometry("1200x760")
         root.minsize(980, 620)
         self._build()
-        self._refresh_profiles()
+        self._load_profile_controls()
         self._refresh_stats()
         self._browse()
         root.after(100, self._poll)
@@ -115,7 +114,7 @@ class CleanerApp:
 
         main = tk.Frame(page, background=COLORS["bg"])
         main.pack(fill="both", expand=True, pady=(12, 12))
-        self.profile_panel = Panel(main, title="profile", number=4)
+        self.profile_panel = Panel(main, title="rules", number=4)
         self.profile_panel.pack(side="right", fill="y")
         self.conversations_panel = Panel(main, title="conversations", number=3)
         self.conversations_panel.pack(side="left", fill="both", expand=True, padx=(0, 12))
@@ -135,9 +134,6 @@ class CleanerApp:
         self.tree.bind("<Command-a>", self._select_all_visible)
 
         body = self.profile_panel.body
-        self.profile_combo = ttk.Combobox(body, textvariable=self.profile_name, state="readonly", width=20)
-        self.profile_combo.pack(anchor="w")
-        self.profile_combo.bind("<<ComboboxSelected>>", lambda _e: self._profile_changed())
         self.profile_vars: dict[str, tk.BooleanVar] = {}
         self.profile_toggles: dict[str, ToggleRow] = {}
 
@@ -169,15 +165,14 @@ class CleanerApp:
         ttk.Button(body, text="export corpus…", command=self._export).pack(fill="x")
         ttk.Button(body, text="export selected…", command=self._export_selected).pack(fill="x", pady=(6, 0))
         ttk.Button(body, text="export latest changes…", command=lambda: self._export(delta=True)).pack(fill="x", pady=(6, 0))
-        ttk.Button(body, text="rename / edit profile…", command=self._edit_profile).pack(fill="x", pady=(14, 0))
 
         self.hotkeys: dict[str, Callable[[], Any]] = {
             "i": self._choose_import, "e": self._export, "/": self._focus_search,
-            "p": self._edit_profile, "x": self._toggle_filtered, "h": self._show_history,
+            "x": self._toggle_filtered, "h": self._show_history,
         }
         self.status_bar = StatusBar(self.root, keys=(
             ("i", "import"), ("e", "export"), ("/", "search"),
-            ("p", "profile"), ("x", "excluded"), ("h", "history"),
+            ("x", "excluded"), ("h", "history"),
         ))
         self.status_bar.pack(fill="x", side="bottom")
         self.root.bind("<Key>", self._hotkey)
@@ -191,7 +186,7 @@ class CleanerApp:
 
     def _current_profile(self) -> dict[str, Any]:
         profiles = {p["name"]: p for p in list_profiles(self.database_path)}
-        return {**DEFAULT_PROFILE, **profiles.get(self.profile_name.get(), {})}
+        return {**DEFAULT_PROFILE, **profiles.get(self.profile_name, {})}
 
     def _hotkey(self, event: tk.Event) -> None:
         widget = self.root.focus_get()
@@ -237,13 +232,13 @@ class CleanerApp:
             self._browse()
             return
         self._background("rows", lambda: search(
-            database_path=self.database_path, query=self.query.get(), profile_name=self.profile_name.get(),
+            database_path=self.database_path, query=self.query.get(), profile_name=self.profile_name,
             include_filtered=self.include_filtered.get(), provider=self._optional_provider(),
         ))
 
     def _browse(self) -> None:
         self._background("rows", lambda: list_conversations(
-            database_path=self.database_path, profile_name=self.profile_name.get(),
+            database_path=self.database_path, profile_name=self.profile_name,
             include_filtered=self.include_filtered.get(), provider=self._optional_provider(),
         ))
 
@@ -303,7 +298,7 @@ class CleanerApp:
         profile[key] = self.profile_vars[key].get()
         save_profile(self.database_path, profile)
         note = " · applies to exports and transcript view" if key in EXPORT_OPTIONS else ""
-        self.status_bar.set_right(f"profile saved{note}")
+        self.status_bar.set_right(f"rules saved{note}")
         self._refresh_stats()
         self._search()
 
@@ -317,7 +312,7 @@ class CleanerApp:
             return
         profile["minimum_user_turns"] = value
         save_profile(self.database_path, profile)
-        self.status_bar.set_right("profile saved")
+        self.status_bar.set_right("rules saved")
         self._refresh_stats()
         self._search()
 
@@ -326,34 +321,6 @@ class CleanerApp:
         for key, variable in self.profile_vars.items():
             variable.set(bool(profile.get(key)))
         self.min_turns.set(int(profile.get("minimum_user_turns") or 0))
-
-    def _edit_profile(self) -> None:
-        current = self._current_profile()
-        window = tk.Toplevel(self.root)
-        window.title("Cleaning profile")
-        window.geometry("460x220")
-        window.configure(background=COLORS["bg"])
-        frame = tk.Frame(window, background=COLORS["bg"])
-        frame.pack(fill="both", expand=True, padx=16, pady=16)
-        tk.Label(frame, text="profile name", background=COLORS["bg"], foreground=COLORS["dim"],
-                 font=font()).grid(row=0, column=0, sticky="w")
-        name = tk.StringVar(value=current["name"])
-        ttk.Entry(frame, textvariable=name, width=28).grid(row=0, column=1, sticky="w", padx=(10, 0))
-        tk.Label(frame, text="Saving under a new name creates a new profile.\nRules and turns are edited live in panel 4.",
-                 background=COLORS["bg"], foreground=COLORS["faint"], font=font(SIZE_SMALL),
-                 justify="left").grid(row=1, column=0, columnspan=2, sticky="w", pady=12)
-
-        def save() -> None:
-            profile = {**current, "name": name.get()}
-            save_profile(self.database_path, profile)
-            self.profile_name.set(profile["name"].strip() or current["name"])
-            window.destroy()
-            self._refresh_profiles()
-            self._refresh_stats()
-            self._browse()
-
-        ttk.Button(frame, text="save profile", command=save).grid(row=2, column=0, pady=10, sticky="w")
-        ttk.Button(frame, text="cancel", command=window.destroy).grid(row=2, column=1, pady=10, sticky="e")
 
     # ------------------------------------------------------------ export
     def _export_dialog(self, title: str) -> str | None:
@@ -371,7 +338,7 @@ class CleanerApp:
         import_id = int(history[0]["import_id"]) if delta and history else None
         self.status_bar.set_right("exporting…")
         self._background("export", lambda: export_cleaned(
-            database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name.get(),
+            database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name,
             included_only=True, import_id=import_id,
             remove_code=bool(profile.get("remove_generated_code")),
             include_attachment_counts=bool(profile.get("include_attachment_counts")),
@@ -388,7 +355,7 @@ class CleanerApp:
         profile = self._current_profile()
         self.status_bar.set_right(f"exporting {len(keys):,} selected…")
         self._background("export", lambda: export_cleaned(
-            database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name.get(),
+            database_path=self.database_path, output_path=Path(output), profile_name=self.profile_name,
             included_only=False, selected_keys=keys,
             remove_code=bool(profile.get("remove_generated_code")),
             include_attachment_counts=bool(profile.get("include_attachment_counts")),
@@ -454,20 +421,8 @@ class CleanerApp:
         self._background("history", lambda: import_history(self.database_path, 100))
 
     # ------------------------------------------------------------ refresh + events
-    def _profile_changed(self) -> None:
-        self._load_profile_controls()
-        self._refresh_stats()
-        self._browse()
-
-    def _refresh_profiles(self) -> None:
-        names = [p["name"] for p in list_profiles(self.database_path)]
-        self.profile_combo.configure(values=names)
-        if self.profile_name.get() not in names and names:
-            self.profile_name.set(names[0])
-        self._load_profile_controls()
-
     def _refresh_stats(self) -> None:
-        self._background("stats", lambda: stats(self.database_path, self.profile_name.get()))
+        self._background("stats", lambda: stats(self.database_path, self.profile_name))
 
     def _background(self, kind: str, operation: Callable[[], Any]) -> None:
         def worker() -> None:
