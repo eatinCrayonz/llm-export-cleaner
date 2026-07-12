@@ -26,8 +26,8 @@ your user folder and creates Desktop and Start Menu shortcuts.
 **From source** (Windows/macOS/Linux, Python 3.11+ with tkinter):
 
 ```bash
-git clone https://github.com/eatinCrayonz/llm_export_cleaner
-cd llm_export_cleaner
+git clone https://github.com/eatinCrayonz/llm-export-cleaner
+cd llm-export-cleaner
 pip install -e .
 llm-export-cleaner-app     # desktop app
 llm-export-cleaner --help  # CLI
