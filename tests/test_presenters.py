@@ -18,7 +18,7 @@ class RowFormattingTests(unittest.TestCase):
         }
         self.assertEqual(
             presenters.format_row(row),
-            ("2025-02-01T00:01:00Z", "claude", 2, "Research", "Evolution", "inherited [variation]"),
+            ("2025-02-01 00:01", "claude", 2, "Research", "Evolution", "inherited [variation]"),
         )
 
     def test_excluded_row_shows_joined_reasons(self) -> None:
@@ -32,7 +32,11 @@ class RowFormattingTests(unittest.TestCase):
 
     def test_date_falls_back_from_updated_to_created(self) -> None:
         row = {"provider": "claude", "created_at": "2025-01-01T00:00:00Z"}
-        self.assertEqual(presenters.format_row(row)[0], "2025-01-01T00:00:00Z")
+        self.assertEqual(presenters.format_row(row)[0], "2025-01-01 00:00")
+
+    def test_display_date_passes_short_or_odd_values_through(self) -> None:
+        self.assertEqual(presenters.display_date(""), "")
+        self.assertEqual(presenters.display_date("2025-05-14"), "2025-05-14")
 
 
 class SortingTests(unittest.TestCase):
@@ -43,6 +47,7 @@ class SortingTests(unittest.TestCase):
 
     def test_date_sort_key_parses_iso_and_defaults(self) -> None:
         self.assertAlmostEqual(presenters.sort_key("date", "1970-01-01T00:00:10Z"), 10.0)
+        self.assertGreater(presenters.sort_key("date", "2025-05-14 10:01"), presenters.sort_key("date", "2025-05-14 10:00"))
         self.assertEqual(presenters.sort_key("date", ""), float("-inf"))
         self.assertEqual(presenters.sort_key("date", "not a date"), float("-inf"))
 
@@ -99,7 +104,7 @@ class HistoryTests(unittest.TestCase):
         }]
         row = presenters.history_rows(records)[0]
         self.assertEqual(row["title"], "export.json")
-        self.assertEqual(row["updated_at"], "2025-06-01T00:00:00Z")
+        self.assertEqual(presenters.format_row(row)[0], "2025-06-01 00:00")
         self.assertEqual(row["active_user_turn_count"], "import")
         self.assertEqual(row["conversation_id"], "")
         self.assertEqual(row["snippet"], "3 new; 1 changed; 7 unchanged")

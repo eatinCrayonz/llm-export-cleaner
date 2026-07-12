@@ -15,7 +15,11 @@ COLUMN_LABELS = {
     "date": "Date (UTC)", "provider": "Provider", "turns": "User turns",
     "project": "Project", "title": "Conversation", "match": "Match / filter reason",
 }
-COLUMN_WIDTHS = {"date": 165, "provider": 80, "turns": 75, "project": 90, "title": 300, "match": 430}
+COLUMN_WIDTHS = {"date": 125, "provider": 70, "turns": 70, "project": 100, "title": 280, "match": 240}
+
+
+def display_date(value: str) -> str:
+    return value[:16].replace("T", " ") if len(value) >= 16 else value
 
 
 def format_row(row: dict[str, Any]) -> tuple[Any, ...]:
@@ -23,7 +27,7 @@ def format_row(row: dict[str, Any]) -> tuple[Any, ...]:
         ", ".join(row.get("reasons") or []) if not row.get("included", 1) else "Included"
     )
     return (
-        row.get("updated_at") or row.get("created_at") or "",
+        display_date(row.get("updated_at") or row.get("created_at") or ""),
         row["provider"],
         row.get("active_user_turn_count", 0),
         row.get("project_name") or "",
