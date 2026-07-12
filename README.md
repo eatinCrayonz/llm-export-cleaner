@@ -1,12 +1,17 @@
 # LLM Export Cleaner
 
-A local Windows application that removes unnecessary provider metadata from
-ChatGPT, Claude, and Grok exports, incrementally maintains a minimal cleaned
-library, filters obvious low-value conversations using visible saved rules,
-searches cleaned text, and exports portable JSON or JSONL.
+Your ChatGPT, Claude, and Grok exports are mostly metadata. LLM Export
+Cleaner strips them into a clean, searchable library on your own machine
+and exports transcripts you can actually read — or hand straight to an
+LLM. No cloud, no API keys, no model calls, no dependencies.
 
-It contains no model calls, semantic scoring, cognitive analysis, or cloud
-service. Raw exports remain external; the cleaned SQLite library is stored at:
+![LLM Export Cleaner — terminal-style desktop app](docs/screenshot.png)
+
+It incrementally merges overlapping exports (nothing is ever deleted),
+filters low-value conversations with visible, reversible rules, full-text
+searches everything, and writes plain text, Markdown, JSON, or JSONL —
+each with an audit manifest. Raw exports remain external; the cleaned
+SQLite library is stored at:
 
 ```text
 %LOCALAPPDATA%\LLM Export Cleaner\cleaner.sqlite3

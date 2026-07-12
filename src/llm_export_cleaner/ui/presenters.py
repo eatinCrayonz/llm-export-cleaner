@@ -12,10 +12,10 @@ from typing import Any, Iterable
 
 COLUMNS = ("date", "provider", "turns", "project", "title", "match")
 COLUMN_LABELS = {
-    "date": "Date (UTC)", "provider": "Provider", "turns": "User turns",
+    "date": "Date (UTC)", "provider": "Provider", "turns": "Turns",
     "project": "Project", "title": "Conversation", "match": "Match / filter reason",
 }
-COLUMN_WIDTHS = {"date": 125, "provider": 70, "turns": 70, "project": 100, "title": 280, "match": 240}
+COLUMN_WIDTHS = {"date": 140, "provider": 70, "turns": 55, "project": 100, "title": 280, "match": 240}
 
 
 def display_date(value: str) -> str:
