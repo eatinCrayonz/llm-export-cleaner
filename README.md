@@ -90,6 +90,10 @@ manual, no API key or browser extension:
 | Claude | `conversations_v2` (open a Project first) | **claude pages…** | conversation-to-Project links |
 | ChatGPT | `gizmos/snorlax/sidebar` | **chatgpt projects…** | Project names |
 
+Claude needs both requests because its export contains no Project membership
+at all; ChatGPT's export already links conversations to Projects, so it only
+needs the names.
+
 If the response reports another page (`has_more: true` or a non-null
 `cursor`), copy and import each page the same way. The app reports how many
 records matched and how many Projects remain unnamed.
