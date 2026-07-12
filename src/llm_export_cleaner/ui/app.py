@@ -83,8 +83,8 @@ class CleanerApp:
         ttk.Button(actions, text="claude pages…", command=self._claude_page).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
         ttk.Button(actions, text="chatgpt projects…", command=self._chatgpt_projects).grid(row=1, column=2, sticky="w", padx=(8, 0), pady=(6, 0))
 
-        searchline = tk.Frame(page, background=COLORS["bg"], highlightthickness=1,
-                              highlightbackground=COLORS["line"])
+        self.searchline = searchline = tk.Frame(page, background=COLORS["bg"], highlightthickness=1,
+                                                highlightbackground=COLORS["line"])
         searchline.pack(fill="x", pady=(12, 0))
         inner = tk.Frame(searchline, background=COLORS["bg"])
         inner.pack(fill="x", padx=12, pady=7)
@@ -165,12 +165,19 @@ class CleanerApp:
         ttk.Button(body, text="export latest changes…", command=lambda: self._export(delta=True)).pack(fill="x", pady=(6, 0))
         ttk.Button(body, text="rename / edit profile…", command=self._edit_profile).pack(fill="x", pady=(14, 0))
 
+        self.hotkeys: dict[str, Callable[[], Any]] = {
+            "i": self._choose_import, "e": self._export, "/": self._focus_search,
+            "p": self._edit_profile, "x": self._toggle_filtered, "h": self._show_history,
+        }
         self.status_bar = StatusBar(self.root, keys=(
             ("i", "import"), ("e", "export"), ("/", "search"),
             ("p", "profile"), ("x", "filtered"), ("h", "history"),
         ))
         self.status_bar.pack(fill="x", side="bottom")
         self.root.bind("<Key>", self._hotkey)
+        self.search_entry.bind("<FocusIn>", lambda _e: self._set_region_focus("search"), add=True)
+        self.tree.bind("<FocusIn>", lambda _e: self._set_region_focus("conversations"), add=True)
+        self._set_region_focus("conversations")
 
     # ------------------------------------------------------------ helpers
     def _optional_provider(self) -> str | None:
@@ -187,13 +194,15 @@ class CleanerApp:
         widget = self.root.focus_get()
         if widget is not None and widget.winfo_class() in TEXT_WIDGETS:
             return
-        actions: dict[str, Callable[[], Any]] = {
-            "i": self._choose_import, "e": self._export, "p": self._edit_profile,
-            "h": self._show_history, "/": self._focus_search, "x": self._toggle_filtered,
-        }
-        action = actions.get(event.char.lower() if event.char else "")
+        action = self.hotkeys.get(event.char.lower() if event.char else "")
         if action:
             action()
+
+    def _set_region_focus(self, region: str) -> None:
+        search_focused = region == "search"
+        color = COLORS["cyan"] if search_focused else COLORS["line"]
+        self.searchline.configure(highlightbackground=color, highlightcolor=color)
+        self.conversations_panel.set_focus(not search_focused)
 
     def _focus_search(self) -> None:
         self.search_entry.focus_set()

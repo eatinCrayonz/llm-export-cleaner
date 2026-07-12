@@ -11,6 +11,13 @@ if getattr(sys, "frozen", False):
     os.environ.setdefault("TCL_LIBRARY", str(runtime / "_tcl_data"))
     os.environ.setdefault("TK_LIBRARY", str(runtime / "_tk_data"))
 
+if sys.platform == "win32":  # crisp fonts on high-DPI displays
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+
 from llm_export_cleaner.ui.app import CleanerApp, main  # noqa: E402,F401
 
 
