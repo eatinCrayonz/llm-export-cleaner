@@ -22,7 +22,8 @@ foreach ($Folder in @($Desktop, $StartMenu)) {
     $Shortcut = $Shell.CreateShortcut((Join-Path $Folder "LLM Export Cleaner.lnk"))
     $Shortcut.TargetPath = $Executable
     $Shortcut.WorkingDirectory = $InstallRoot
-    $Shortcut.IconLocation = "$Executable,0"
+    $Icon = Join-Path $InstallRoot "icon.ico"
+    $Shortcut.IconLocation = if (Test-Path $Icon) { "$Icon,0" } else { "$Executable,0" }
     $Shortcut.Description = "Clean, filter, search, and export LLM conversations"
     $Shortcut.Save()
 }
