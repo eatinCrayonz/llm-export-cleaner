@@ -30,6 +30,8 @@ $env:TK_LIBRARY = Join-Path $PythonHome "tcl\tk8.6"
 & $VenvPython -m PyInstaller --noconfirm --clean --windowed --onedir `
     --name LLMExportCleaner --distpath $DistRoot `
     --workpath (Join-Path $BuildRoot "pyinstaller") --specpath $BuildRoot `
+    --icon (Join-Path $RepoRoot "assets\icon.ico") `
+    --add-data ((Join-Path $RepoRoot "src\llm_export_cleaner\assets") + ";llm_export_cleaner\assets") `
     (Join-Path $RepoRoot "src\llm_export_cleaner\desktop.py")
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 

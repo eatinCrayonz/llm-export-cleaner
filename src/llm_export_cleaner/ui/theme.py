@@ -6,6 +6,7 @@ reference these tokens instead of literal values.
 
 from __future__ import annotations
 
+import sys
 from typing import Iterable
 
 
@@ -49,6 +50,23 @@ def font_family() -> str:
 
 def font(size: int = SIZE_BASE, *, bold: bool = False) -> tuple:
     return (font_family(), size, "bold") if bold else (font_family(), size)
+
+
+def apply_dark_title_bar(window) -> None:
+    """Ask DWM for the dark window frame (Windows 10 1809+; no-op elsewhere)."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        window.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        value = ctypes.c_int(1)
+        for attribute in (20, 19):  # DWMWA_USE_IMMERSIVE_DARK_MODE, pre-20H1 value
+            if ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, attribute, ctypes.byref(value), ctypes.sizeof(value)) == 0:
+                break
+    except Exception:
+        pass
 
 
 def apply_theme(root) -> None:

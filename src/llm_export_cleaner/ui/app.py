@@ -18,7 +18,7 @@ from llm_export_cleaner.library import (
     list_conversations, list_profiles, save_profile, search, stats,
 )
 from llm_export_cleaner.ui import presenters
-from llm_export_cleaner.ui.theme import COLORS, SIZE_SMALL, apply_theme, font
+from llm_export_cleaner.ui.theme import COLORS, SIZE_SMALL, apply_dark_title_bar, apply_theme, font
 from llm_export_cleaner.ui.widgets import KeyValueGrid, Panel, StatusBar, ToggleRow
 
 
@@ -47,6 +47,11 @@ class CleanerApp:
         root.title("llm-export-cleaner")
         root.geometry("1200x760")
         root.minsize(980, 620)
+        icon = Path(__file__).resolve().parent.parent / "assets" / "icon-64.png"
+        if icon.is_file():
+            self._icon = tk.PhotoImage(file=str(icon))
+            root.iconphoto(True, self._icon)
+        apply_dark_title_bar(root)
         self._build()
         self._load_profile_controls()
         self._refresh_stats()
@@ -276,6 +281,7 @@ class CleanerApp:
         window.title(conversation.get("title") or "Untitled")
         window.geometry("900x700")
         window.configure(background=COLORS["bg"])
+        apply_dark_title_bar(window)
         text = scrolledtext.ScrolledText(
             window, wrap="word", padx=14, pady=14, background=COLORS["bg"],
             foreground=COLORS["txt"], insertbackground=COLORS["cyan"], font=font(),
@@ -368,6 +374,7 @@ class CleanerApp:
         window.title(title)
         window.geometry("760x600")
         window.configure(background=COLORS["bg"])
+        apply_dark_title_bar(window)
         frame = tk.Frame(window, background=COLORS["bg"])
         frame.pack(fill="both", expand=True, padx=14, pady=14)
         tk.Label(frame, text=caption, wraplength=700, background=COLORS["bg"],
