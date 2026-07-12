@@ -118,6 +118,20 @@ class LibraryTests(unittest.TestCase):
             self.assertEqual(stats(db, "Keep all")["included"], 1)
             self.assertEqual(len(list_conversations(database_path=db, profile_name="Keep all")), 1)
 
+    def test_claude_import_reads_sibling_projects_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); db = root / "cleaner.sqlite3"
+            export = root / "conversations.json"
+            self._write_claude(export, extended=True)
+            projects = root / "projects"; projects.mkdir()
+            (projects / "p1.json").write_text(json.dumps({"uuid": "p1", "name": "Research", "docs": []}), encoding="utf-8")
+            (projects / "bad.json").write_text("{not json", encoding="utf-8")
+            result = import_export(provider="claude", input_path=export, database_path=db)
+            apply_page(database_path=db, page_text=json.dumps({"data": [{"uuid": "c1", "project_uuid": "p1"}], "has_more": False}))
+            rows = list_conversations(database_path=db, in_project=True)
+        self.assertEqual(result["project_names_imported"], 1)
+        self.assertEqual(rows[0]["project_name"], "Research")
+
     def test_older_overlapping_export_does_not_regress_newer_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); db = root / "cleaner.sqlite3"

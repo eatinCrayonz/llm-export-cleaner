@@ -100,9 +100,11 @@ def progress_text(current: int, total: int) -> str:
 def import_status_text(payload: dict[str, Any]) -> str:
     if payload["duplicate_export"]:
         return "Already imported"
+    names = payload.get("project_names_imported") or 0
+    suffix = f"; {names} project names" if names else ""
     return (
         f"{payload['new_conversations']} new; {payload['changed_conversations']} changed; "
-        f"{payload['unchanged_conversations']} unchanged"
+        f"{payload['unchanged_conversations']} unchanged{suffix}"
     )
 
 

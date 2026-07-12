@@ -269,6 +269,7 @@ def import_export(
                 _merge_conversation(db, record, import_id, stats)
                 if progress:
                     progress(index, total)
+            project_names = _import_sibling_project_names(db, provider, source)
             db.execute(
                 "UPDATE imports SET new_conversations=?,changed_conversations=?,unchanged_conversations=?,new_messages=?,changed_messages=?,unchanged_messages=?,audit_json=? WHERE import_id=?",
                 (stats["new_conversations"], stats["changed_conversations"], stats["unchanged_conversations"], stats["new_messages"], stats["changed_messages"], stats["unchanged_messages"], json.dumps(audit.as_dict(), sort_keys=True), import_id),
@@ -282,8 +283,34 @@ def import_export(
             "new_conversations", "changed_conversations", "unchanged_conversations",
             "new_messages", "changed_messages", "unchanged_messages",
         )},
+        "project_names_imported": project_names,
         "audit": audit.as_dict(),
     }
+
+
+def _import_sibling_project_names(db: sqlite3.Connection, provider: str, source: Path) -> int:
+    """Claude exports ship projects/*.json with names but no membership."""
+    directory = source.parent / "projects"
+    if provider != "claude" or not directory.is_dir():
+        return 0
+    count = 0
+    for path in sorted(directory.glob("*.json")):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        project_id = str(record.get("uuid") or "").strip()
+        name = str(record.get("name") or "").strip()
+        if project_id and name:
+            db.execute(
+                "INSERT INTO projects(provider,project_id,name) VALUES('claude',?,?) "
+                "ON CONFLICT(provider,project_id) DO UPDATE SET name=excluded.name",
+                (project_id, name),
+            )
+            count += 1
+    return count
 
 
 def _merge_conversation(db: sqlite3.Connection, record: dict[str, Any], import_id: int, stats: Counter[str]) -> None:

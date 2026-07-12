@@ -11,3 +11,8 @@ data/
 *.sqlite3
 *.db
 *.jsonl
+
+# raw provider exports must never be committed
+claude - */
+chatgpt - */
+grok - */

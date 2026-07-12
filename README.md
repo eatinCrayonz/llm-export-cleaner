@@ -75,9 +75,10 @@ conversations and their reasons.
 
 ## Recovering Project names
 
-Provider exports record Project membership but rarely Project names. To fill
-the names in, copy a JSON response out of the provider's own website — local,
-manual, no API key or browser extension:
+Claude's export ships Project names automatically: the `projects` folder that
+arrives beside `conversations.json` is read during import, so keep the export
+folder together. What no export contains is filled in by copying a JSON
+response out of the provider's own website — local, manual, no API key:
 
 1. In the provider's web app, press **F12**, open **Network**, select
    **Fetch/XHR**, and reload the page.
@@ -86,21 +87,14 @@ manual, no API key or browser extension:
 
 | Provider | Network request | App button | Provides |
 | --- | --- | --- | --- |
-| Claude | `projects_v2` | **claude pages…** | Project names |
 | Claude | `conversations_v2` (open a Project first) | **claude pages…** | conversation-to-Project links |
 | ChatGPT | `gizmos/snorlax/sidebar` | **chatgpt projects…** | Project names |
 
-Claude needs both requests because its export contains no Project membership
-at all; ChatGPT's export already links conversations to Projects, so it only
-needs the names.
-
-If the response reports another page (`has_more: true` or a non-null
-`cursor`), copy and import each page the same way. The app reports how many
-records matched and how many Projects remain unnamed.
-
-These responses can include account identifiers and other private metadata.
-They stay on your machine and only IDs and names are kept — but do not publish
-the raw copies.
+The asymmetry is the providers': Claude's export has Project names but no
+membership, ChatGPT's has membership but no names. If a response reports
+another page (`has_more: true` or a non-null `cursor`), copy and import each
+page. These responses can include account identifiers — they stay local and
+only IDs and names are kept, but do not publish the raw copies.
 
 ## Clean exports
 

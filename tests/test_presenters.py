@@ -113,6 +113,8 @@ class StatusTextTests(unittest.TestCase):
         self.assertEqual(presenters.import_status_text({"duplicate_export": True}), "Already imported")
         payload = {"duplicate_export": False, "new_conversations": 2, "changed_conversations": 0, "unchanged_conversations": 5}
         self.assertEqual(presenters.import_status_text(payload), "2 new; 0 changed; 5 unchanged")
+        payload["project_names_imported"] = 17
+        self.assertEqual(presenters.import_status_text(payload), "2 new; 0 changed; 5 unchanged; 17 project names")
 
     def test_stats_and_profile_status(self) -> None:
         payload = {"conversations": 1247, "messages": 18932, "imports": 9, "included": 1189, "filtered": 58}
