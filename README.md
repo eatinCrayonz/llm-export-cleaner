@@ -14,16 +14,24 @@ service. Raw exports remain external; the cleaned SQLite library is stored at:
 
 ## Desktop workflow
 
-1. Select the provider and import its JSON export.
-2. Edit or select a cleaning profile.
-3. Search or browse retained conversations.
-4. Export either the complete current cleaned corpus or only the latest import's
-   new and changed conversations.
+The desktop app uses a terminal-style layout of numbered panels: **1 ·
+library** (stats), **2 · imports**, a `/` search line, **3 ·
+conversations**, and **4 · profile**, where cleaning rules are toggled
+live and take effect immediately.
 
-The conversation table supports extended selection: `Ctrl+click` toggles rows,
-`Shift+click` selects ranges, and `Ctrl+A` selects every currently displayed
-row. **Export selected...** writes only those conversations, in their visible
-table order, using the active cleaning profile.
+1. Select the provider and import its JSON export (panel 2).
+2. Toggle cleaning rules or switch profiles (panel 4).
+3. Search or browse retained conversations; excluded rows appear dimmed
+   with their filter reason when **filtered** is on.
+4. Export the complete cleaned corpus, only the latest import's changes,
+   or just the selected rows.
+
+Keyboard: `i` import · `e` export · `/` search · `p` profile · `x` show
+filtered · `h` history. The conversation table supports extended
+selection: `Ctrl+click` toggles rows, `Shift+click` selects ranges, and
+`Ctrl+A` selects every currently displayed row. **export selected…**
+writes only those conversations, in their visible table order, using
+the active cleaning profile.
 
 The default profile excludes single-exchange conversations and requires two user
 turns, while preserving short Project conversations. Filtering is reversible:

@@ -17,7 +17,8 @@ if ($ProvidedPython) {
     }
 }
 if (-not (Test-Path $VenvPython)) { & $Python -m venv $Venv }
-& $VenvPython -m pip install --no-build-isolation -e $RepoRoot pyinstaller
+& $VenvPython -m pip install --upgrade pip setuptools
+& $VenvPython -m pip install -e $RepoRoot pyinstaller
 if ($LASTEXITCODE -ne 0) { throw "Unable to install build dependencies." }
 
 $Config = Get-Content (Join-Path $Venv "pyvenv.cfg")
