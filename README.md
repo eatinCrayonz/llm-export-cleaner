@@ -5,8 +5,6 @@ Cleaner strips them into a clean, searchable library on your own machine
 and exports transcripts you can actually read — or hand straight to an
 LLM. No cloud, no API keys, no model calls, no dependencies.
 
-![LLM Export Cleaner — terminal-style desktop app](docs/screenshot.png)
-
 It incrementally merges overlapping exports (nothing is ever deleted),
 filters low-value conversations with visible, reversible rules, full-text
 searches everything, and writes plain text, Markdown, JSON, or JSONL —
