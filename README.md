@@ -12,6 +12,22 @@ service. Raw exports remain external; the cleaned SQLite library is stored at:
 %LOCALAPPDATA%\LLM Export Cleaner\cleaner.sqlite3
 ```
 
+## Quick start
+
+**Windows, no Python needed:** download `LLMExportCleaner-Windows.zip`
+from the Releases page, extract it, and run `Install.cmd`. It installs to
+your user folder and creates Desktop and Start Menu shortcuts.
+
+**From source** (Windows/macOS/Linux, Python 3.11+ with tkinter):
+
+```bash
+git clone https://github.com/eatinCrayonz/llm_export_cleaner
+cd llm_export_cleaner
+pip install -e .
+llm-export-cleaner-app     # desktop app
+llm-export-cleaner --help  # CLI
+```
+
 ## Desktop workflow
 
 The desktop app uses a terminal-style layout of numbered panels: **1 ·
